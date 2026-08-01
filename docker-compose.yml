@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  # PostgreSQL + TimescaleDB
+  postgres:
+    image: timescale/timescaledb:latest-pg14  # Official TimescaleDB image
+    container_name: ev_coorp_postgres
+    environment:
+      POSTGRES_USER: ev_user
+      POSTGRES_PASSWORD: ev_password
+      POSTGRES_DB: ev_coorp
+    ports:
+      - "5432:5432"  # Expose PostgreSQL port
+    volumes:
+      - postgres_data:/var/lib/postgresql/data  # Persist data between restarts
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ev_user -d ev_coorp"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:  # Named volume for persistent data
