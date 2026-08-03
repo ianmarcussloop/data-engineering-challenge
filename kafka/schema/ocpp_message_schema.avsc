@@ -1,0 +1,9 @@
+{
+    "type": "record",
+    "name": "OCPPMessage",
+    "fields": [
+        {"name": "chargerId", "type": "string"},  # <-- ADD THIS
+        {"name": "uniqueId", "type": "string"},
+        {"name": "message", "type": "string"}
+    ]
+}

@@ -60,3 +60,22 @@ The structure above is just one example - you're free to use any output format t
 - Choose technologies and approaches that best fit the problem - we value thoughtful technical decisions and a good balance between simplicity and performance and pragmatism
 - Consider how to determine operational status in incomplete or inconsistent scenarios
 - To calculate the energy consumption you would have to calculate the integral of the power curve over time, but for simplicity you can safely approximate this by the average of the power curve and multiply it by the duration of the session to create a simple estimate. e.g. 5kW * 1h = 5kWh. Look for `Power.Active.Import`.
+
+# Run
+
+## Initialization
+
+### Python
+- `uv sync`
+
+### Docker
+- `docker compose down`
+- `docker compose up -d --build`
+
+### Kafka
+- `uv run python kafka/scripts/create_topics.py`
+- `uv run python kafka/scripts/ocpp_producer.py`
+
+### PotsgresDB
+- `uv run python postgres/scripts/init_db.py`
+- `uv run python postgres/scripts/kafka_to_postgres.py`
