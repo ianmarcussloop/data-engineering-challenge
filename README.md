@@ -79,3 +79,6 @@ The structure above is just one example - you're free to use any output format t
 ### PotsgresDB
 - `uv run python postgres/scripts/init_db.py`
 - `uv run python postgres/scripts/kafka_to_postgres.py`
+
+### Spark
+- `uv run python spark/scripts/spark_kafka_to_postgres.py`

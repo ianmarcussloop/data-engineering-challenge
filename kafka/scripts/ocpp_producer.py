@@ -1,29 +1,13 @@
 from confluent_kafka import Producer
-from confluent_kafka.serialization import SerializationContext, MessageField
-from confluent_kafka.schema_registry import SchemaRegistryClient
-from confluent_kafka.schema_registry.avro import AvroSerializer
 import json
 import os
-import ast  # For safely evaluating strings as Python literals
-import re   # For regex-based parsing
+import ast
+import re
 
 # --- Configuration ---
 KAFKA_BROKER = os.getenv("KAFKA_BROKER", "localhost:9092")
-SCHEMA_REGISTRY_URL = os.getenv("SCHEMA_REGISTRY_URL", "http://localhost:8081")
 TOPIC_NAME = "ocpp.messages"
-SCHEMA_SUBJECT = f"{TOPIC_NAME}-value"
-TXT_FILE_PATH = "ocpp-sample-data.txt"  # Path to your .txt file
-
-# --- Schema Definition (must match registered schema) ---
-SCHEMA_DEFINITION = {
-    "type": "record",
-    "name": "OCPPMessage",
-    "fields": [
-        {"name": "chargerId", "type": "string"},  # <-- ADD THIS
-        {"name": "uniqueId", "type": "string"},
-        {"name": "message", "type": "string"}
-    ]
-}
+TXT_FILE_PATH = "ocpp-sample-data.txt"
 
 # --- Parse .txt File ---
 def parse_txt_file(file_path):
@@ -66,33 +50,18 @@ def parse_txt_file(file_path):
 
 # --- Publish to Kafka ---
 def publish_to_kafka(messages):
-    # Initialize Schema Registry and Avro Serializer
-    schema_registry = SchemaRegistryClient({"url": SCHEMA_REGISTRY_URL})
-
-    # Initialize AvroSerializer
-    avro_serializer = AvroSerializer(
-        schema_registry_client=schema_registry,
-        schema_str=json.dumps(SCHEMA_DEFINITION)
-    )
-
-    # Initialize Producer
     producer = Producer({"bootstrap.servers": KAFKA_BROKER})
 
-    # Publish each message
     for message in messages:
         try:
             producer.produce(
                 topic=TOPIC_NAME,
-                value=avro_serializer(
-                    message,
-                    SerializationContext(TOPIC_NAME, MessageField.VALUE)
-                )
+                value=json.dumps(message).encode('utf-8')
             )
             print(f"✅ Published: {message}")
         except Exception as e:
             print(f"❌ Failed to publish {message}: {e}")
 
-    # Flush to ensure all messages are sent
     producer.flush()
     print("✨ All messages published!")
 

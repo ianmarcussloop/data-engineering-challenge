@@ -81,6 +81,18 @@ services:
       - ./grafana/provisioning:/etc/grafana/provisioning  # Mount provisioning files
     restart: unless-stopped
 
+  spark:
+    image: spark:latest
+    volumes:
+      - ./spark/scripts:/app
+    environment:
+      - SPARK_MODE=standalone
+    ports:
+      - "4040:4040"
+    depends_on:
+      - kafka
+      - postgres
+
 volumes:
   postgres_data:
   grafana_data:
