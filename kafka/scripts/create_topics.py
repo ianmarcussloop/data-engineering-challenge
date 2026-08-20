@@ -29,10 +29,14 @@ def create_kafka_topic():
 
     # Define all topics to create
     topics = [
-        # Main raw OCPP messages topic
+        # Main raw OCPP messages topic - only validated request/response pairs
         ("ocpp.messages", 1, 1, {}),
         # Test raw OCPP messages topic
         ("ocpp.messages_test", 1, 1, {}),
+        # Malformed messages topic - for messages without complete pairs
+        ("ocpp.malformed", 1, 1, {}),
+        # Test malformed messages topic
+        ("ocpp.malformed_test", 1, 1, {}),
         
         # NEW: Normalized topic - all processed messages for ACTIVE sessions only
         ("ocpp.active.raw", 10, 1, {

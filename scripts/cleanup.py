@@ -83,6 +83,7 @@ class CleanupScript:
     # Main project topics
     MAIN_TOPICS = [
         "ocpp.messages",
+        "ocpp.malformed",
         "ocpp.active.raw",
         "ocpp.active",
     ]
@@ -90,6 +91,7 @@ class CleanupScript:
     # Test topics
     TEST_TOPICS = [
         "ocpp.messages_test",
+        "ocpp.malformed_test",
         "ocpp.active_test",
         "ocpp.active.raw_test",
     ]

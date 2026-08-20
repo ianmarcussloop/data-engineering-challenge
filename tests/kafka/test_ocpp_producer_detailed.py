@@ -200,41 +200,41 @@ class TestPublishToKafka:
     """Tests for the publish_to_kafka function."""
 
     def test_publish_empty_list(self, monkeypatch):
-        """Test publishing an empty list of messages."""
+        """Test publishing empty lists of messages."""
         from unittest.mock import MagicMock, patch
         
         mock_producer = MagicMock()
         with patch('ocpp_producer.Producer', return_value=mock_producer):
-            publish_to_kafka([])
+            publish_to_kafka([], [], [], [])
         
         # Producer should be created but no messages should be published
         mock_producer.produce.assert_not_called()
         mock_producer.flush.assert_called_once()
 
     def test_publish_single_message(self, monkeypatch):
-        """Test publishing a single message."""
+        """Test publishing a single validated message pair."""
         from unittest.mock import MagicMock, patch
         
         mock_producer = MagicMock()
         with patch('ocpp_producer.Producer', return_value=mock_producer):
-            messages = [{"chargerId": "charger1", "uniqueId": "msg001", "message": "test"}]
-            publish_to_kafka(messages)
+            validated_pairs = [{"chargerId": "charger1", "uniqueId": "msg001", "request": [2, "msg001", "Heartbeat", {}], "response": [3, "msg001", {}]}]
+            publish_to_kafka(validated_pairs, [], [], [])
         
         mock_producer.produce.assert_called_once()
         mock_producer.flush.assert_called_once()
 
     def test_publish_multiple_messages(self, monkeypatch):
-        """Test publishing multiple messages."""
+        """Test publishing multiple validated message pairs."""
         from unittest.mock import MagicMock, patch
         
         mock_producer = MagicMock()
         with patch('ocpp_producer.Producer', return_value=mock_producer):
-            messages = [
-                {"chargerId": "charger1", "uniqueId": "msg001", "message": "test1"},
-                {"chargerId": "charger2", "uniqueId": "msg002", "message": "test2"},
-                {"chargerId": "charger3", "uniqueId": "msg003", "message": "test3"}
+            validated_pairs = [
+                {"chargerId": "charger1", "uniqueId": "msg001", "request": [2, "msg001", "Heartbeat", {}], "response": [3, "msg001", {}]},
+                {"chargerId": "charger2", "uniqueId": "msg002", "request": [2, "msg002", "Heartbeat", {}], "response": [3, "msg002", {}]},
+                {"chargerId": "charger3", "uniqueId": "msg003", "request": [2, "msg003", "Heartbeat", {}], "response": [3, "msg003", {}]}
             ]
-            publish_to_kafka(messages)
+            publish_to_kafka(validated_pairs, [], [], [])
         
         assert mock_producer.produce.call_count == 3
         mock_producer.flush.assert_called_once()
@@ -247,9 +247,9 @@ class TestPublishToKafka:
         mock_producer = MagicMock()
         mock_producer.produce.side_effect = Exception("Producer error")
         with patch('ocpp_producer.Producer', return_value=mock_producer):
-            messages = [{"chargerId": "charger1", "uniqueId": "msg001", "message": "test"}]
+            validated_pairs = [{"chargerId": "charger1", "uniqueId": "msg001", "request": [2, "msg001", "Heartbeat", {}], "response": [3, "msg001", {}]}]
             
             with caplog.at_level(logging.ERROR):
-                publish_to_kafka(messages)
+                publish_to_kafka(validated_pairs, [], [], [])
         
         mock_producer.flush.assert_called_once()
