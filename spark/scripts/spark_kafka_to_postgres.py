@@ -208,6 +208,7 @@ def run_pipeline():
         .option("kafka.bootstrap.servers", KAFKA_BROKER) \
         .option("subscribe", "ocpp.messages,ocpp.messages_test") \
         .option("startingOffsets", "earliest") \
+        .option("failOnDataLoss", "false") \
         .load()
 
     # Parse JSON and extract fields

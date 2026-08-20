@@ -50,18 +50,48 @@ def parse_txt_file(file_path):
 
 # --- Publish to Kafka ---
 def publish_to_kafka(messages):
-    producer = Producer({"bootstrap.servers": KAFKA_BROKER})
+    # Increase queue size and add delivery callback
+    producer = Producer({
+        "bootstrap.servers": KAFKA_BROKER,
+        "queue.buffering.max.messages": 200000,  # Increase from default 100k
+        "queue.buffering.max.ms": 500,  # Wait up to 500ms to batch
+        "message.timeout.ms": 30000,  # 30s timeout for individual messages
+    })
 
-    for message in messages:
+    def delivery_report(err, msg):
+        if err is not None:
+            print(f"❌ Message delivery failed: {err}")
+        else:
+            pass  # Silent success to reduce verbosity
+
+    total = len(messages)
+    for i, message in enumerate(messages):
         try:
             producer.produce(
                 topic=TOPIC_NAME,
-                value=json.dumps(message).encode('utf-8')
+                value=json.dumps(message).encode('utf-8'),
+                callback=delivery_report
             )
-            print(f"✅ Published: {message}")
+            # Poll every 5000 messages to process delivery reports and free queue
+            if i % 5000 == 0:
+                producer.poll(0)
+                print(f"📊 Published {i}/{total} messages...")
         except Exception as e:
-            print(f"❌ Failed to publish {message}: {e}")
+            # Check if it's a queue full error
+            if "Queue full" in str(e):
+                print(f"⚠️ Queue full at {i}/{total}, waiting...")
+                producer.poll(1.0)  # Wait up to 1 second for delivery reports
+                # Retry
+                producer.produce(
+                    topic=TOPIC_NAME,
+                    value=json.dumps(message).encode('utf-8'),
+                    callback=delivery_report
+                )
+            else:
+                print(f"❌ Failed to publish {message}: {e}")
 
+    # Flush remaining messages
+    print(f"🔄 Flushing remaining messages...")
     producer.flush()
     print("✨ All messages published!")
 

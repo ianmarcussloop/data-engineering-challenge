@@ -80,6 +80,7 @@ init:
 	$(MAKE) db-init
 	$(MAKE) kafka-init
 	$(MAKE) produce-data
+	$(MAKE) consume-data
 	@echo "Waiting for data to be processed..."
 	@sleep 10
 	@echo "=== Initialization complete ==="
@@ -102,7 +103,7 @@ init-test:
 
 start:
 	@echo "=== Starting Docker services ==="
-	cd $(PROJECT_DIR) && docker compose up -d postgres zookeeper kafka schema-registry
+	cd $(PROJECT_DIR) && docker compose up -d
 	@echo "Waiting for services to start..."
 	@sleep 30
 	@echo "=== Services started ==="
@@ -113,6 +114,7 @@ stop:
 
 clean:
 	@echo "=== Cleaning up ==="
+	cd $(PROJECT_DIR) && rm -rf spark-checkpoints/
 	cd $(PROJECT_DIR) && docker compose down -v
 
 # =============================================================================
@@ -170,7 +172,7 @@ produce-data:
 consume-data:
 	@echo "=== Consuming data to PostgreSQL ==="
 	@echo "Press Ctrl+C to stop"
-	cd $(PROJECT_DIR) && uv run python postgres/scripts/kafka_to_postgres.py
+	cd $(PROJECT_DIR) && uv run python spark/scripts/spark_kafka_to_postgres.py
 
 # =============================================================================
 # Tests

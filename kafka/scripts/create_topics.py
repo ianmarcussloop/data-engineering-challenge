@@ -22,6 +22,9 @@ SCHEMA_DEFINITION = {
 
 # --- Create Kafka Topic ---
 def create_kafka_topic():
+    import time
+    from confluent_kafka import KafkaException
+    
     admin_client = AdminClient({"bootstrap.servers": KAFKA_BROKER})
 
     # Define all topics to create
@@ -57,8 +60,15 @@ def create_kafka_topic():
                 replication_factor=replication_factor,
                 config=configs
             )
-            admin_client.create_topics([new_topic])
-            print(f"Created Kafka topic: {topic_name}")
+            # Create topic and wait for it to be created
+            future = admin_client.create_topics([new_topic])
+            # Wait for the topic to be created
+            try:
+                future[topic_name].result(timeout=30)
+                print(f"Created Kafka topic: {topic_name}")
+            except KafkaException as e:
+                print(f"Error creating topic {topic_name}: {e}")
+                raise
 
 # TODO: add recreate_kafka_topic() function to delete and recreate the topic if needed? 
 
