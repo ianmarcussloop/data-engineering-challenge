@@ -5,35 +5,6 @@ Tests the helper functions that parse and process OCPP messages.
 """
 import pytest
 import ast
-import pandas as pd
-from datetime import datetime, timedelta
-from typing import Optional, Tuple, List, Dict, Any, Iterator
-
-
-# =============================================================================
-# Mock GroupState for testing update_session
-# =============================================================================
-class MockGroupState:
-    """Mock implementation of pyspark.sql.streaming.GroupState for testing."""
-    def __init__(self, initial_data: Optional[Dict[str, Any]] = None):
-        self._data = initial_data
-        self._exists = initial_data is not None
-
-    def exists(self) -> bool:
-        return self._exists
-
-    def get(self) -> Dict[str, Any]:
-        if not self._exists:
-            raise ValueError("State does not exist")
-        return self._data
-
-    def update(self, data: Dict[str, Any]) -> None:
-        self._data = data
-        self._exists = True
-
-    def remove(self) -> None:
-        self._data = None
-        self._exists = False
 
 
 # =============================================================================
@@ -45,9 +16,19 @@ sys.path.insert(0, '/Users/iansloop/data-engineering-challenge/spark/scripts')
 # Import the functions - safe now that main code is guarded by if __name__ == "__main__"
 from spark_kafka_to_postgres import (
     parse_ocpp_message,
-    extract_power_values,
+    extract_power_value,
     get_transaction_id,
-    update_session,
+    parse_timestamp,
+    parse_action,
+    parse_power,
+    parse_meter_start,
+    parse_meter_stop,
+    parse_id_tag,
+    parse_connector_id,
+    parse_soc,
+    parse_voltage,
+    parse_reason,
+    is_stop_action,
 )
 
 
@@ -97,43 +78,6 @@ def sample_stop_transaction_message():
     )
 
 
-@pytest.fixture
-def sample_status_notification_message():
-    """A sample OCPP StatusNotification message."""
-    return (
-        2,
-        "msg-003",
-        "StatusNotification",
-        {
-            "status": "Available",
-            "timestamp": "2024-01-15T10:00:00Z"
-        }
-    )
-
-
-@pytest.fixture
-def sample_heartbeat_message():
-    """A sample OCPP Heartbeat message."""
-    return (
-        2,
-        "msg-004",
-        "Heartbeat",
-        {}
-    )
-
-
-@pytest.fixture
-def sample_short_message():
-    """A message that's too short to be valid."""
-    return (1, "msg-short")
-
-
-@pytest.fixture
-def sample_invalid_message():
-    """An invalid message string."""
-    return "not a valid tuple"
-
-
 # =============================================================================
 # Tests for parse_ocpp_message
 # =============================================================================
@@ -162,15 +106,16 @@ class TestParseOcppMessage:
         assert result["uniqueId"] == "msg-005"
         assert result["payload"] == {}
 
-    def test_parse_short_message_returns_none(self, sample_short_message):
+    def test_parse_short_message_returns_none(self):
         """Test that messages with less than 3 elements return None."""
-        raw = str(sample_short_message)
+        msg = (1, "msg-short")
+        raw = str(msg)
         result = parse_ocpp_message(raw)
         assert result is None
 
-    def test_parse_invalid_string_returns_none(self, sample_invalid_message):
+    def test_parse_invalid_string_returns_none(self):
         """Test that invalid strings return None."""
-        result = parse_ocpp_message(sample_invalid_message)
+        result = parse_ocpp_message("not a valid tuple")
         assert result is None
 
     def test_parse_empty_string_returns_none(self):
@@ -190,10 +135,10 @@ class TestParseOcppMessage:
 
 
 # =============================================================================
-# Tests for extract_power_values
+# Tests for extract_power_value
 # =============================================================================
-class TestExtractPowerValues:
-    """Tests for the extract_power_values function."""
+class TestExtractPowerValue:
+    """Tests for the extract_power_value function."""
 
     def test_extract_single_power_value(self):
         """Test extracting a single power value."""
@@ -206,19 +151,18 @@ class TestExtractPowerValues:
                 }
             ]
         }
-        result = extract_power_values(payload)
-        assert result == [2200.5]
+        result = extract_power_value(payload)
+        assert result == 2200.5
 
-    def test_extract_multiple_power_values(self, sample_meter_values_message):
-        """Test extracting multiple power values from nested meterValue."""
+    def test_extract_multiple_power_values_returns_first(self, sample_meter_values_message):
+        """Test extracting first power value from nested meterValue (only returns first match)."""
         payload = sample_meter_values_message[3]
-        result = extract_power_values(payload)
-        assert len(result) == 2
-        assert 2200.5 in result
-        assert 2300.0 in result
+        result = extract_power_value(payload)
+        # Returns the first Power.Active.Import value found
+        assert result == 2200.5
 
-    def test_extract_no_power_values_wrong_measurand(self):
-        """Test that non-Power.Active.Import values are ignored."""
+    def test_extract_no_power_value_wrong_measurand(self):
+        """Test that non-Power.Active.Import values return None."""
         payload = {
             "meterValue": [
                 {
@@ -228,24 +172,24 @@ class TestExtractPowerValues:
                 }
             ]
         }
-        result = extract_power_values(payload)
-        assert result == []
+        result = extract_power_value(payload)
+        assert result is None
 
     def test_extract_no_meter_value(self):
         """Test with payload missing meterValue."""
         payload = {"someOtherField": "value"}
-        result = extract_power_values(payload)
-        assert result == []
+        result = extract_power_value(payload)
+        assert result is None
 
     def test_extract_empty_payload(self):
         """Test with empty payload."""
-        result = extract_power_values({})
-        assert result == []
+        result = extract_power_value({})
+        assert result is None
 
     def test_extract_with_none_payload(self):
         """Test with None payload."""
-        result = extract_power_values(None)
-        assert result == []
+        result = extract_power_value(None)
+        assert result is None
 
     def test_extract_with_invalid_value(self):
         """Test with non-numeric value (should be skipped)."""
@@ -258,24 +202,8 @@ class TestExtractPowerValues:
                 }
             ]
         }
-        result = extract_power_values(payload)
-        assert result == []
-
-    def test_extract_mixed_valid_invalid_values(self):
-        """Test with mix of valid and invalid values."""
-        payload = {
-            "meterValue": [
-                {
-                    "sampledValue": [
-                        {"measurand": "Power.Active.Import", "value": "100.5"},
-                        {"measurand": "Power.Active.Import", "value": "invalid"},
-                        {"measurand": "Power.Active.Import", "value": "200.0"},
-                    ]
-                }
-            ]
-        }
-        result = extract_power_values(payload)
-        assert result == [100.5, 200.0]
+        result = extract_power_value(payload)
+        assert result is None
 
 
 # =============================================================================
@@ -290,23 +218,24 @@ class TestGetTransactionId:
         result = get_transaction_id(raw)
         assert result == 123
 
-    def test_fallback_to_unique_id(self, sample_meter_values_message):
-        """Test falling back to uniqueId when no transactionId in payload."""
+    def test_no_transaction_id_returns_none(self, sample_meter_values_message):
+        """Test that messages without transactionId in payload return None."""
         raw = str(sample_meter_values_message)
         result = get_transaction_id(raw)
-        # The payload doesn't have transactionId, so fallback to msg[1] which is "msg-001"
-        assert result == "msg-001"
+        # The payload doesn't have transactionId, so returns None
+        assert result is None
 
-    def test_fallback_with_no_payload(self):
-        """Test fallback when message has no payload."""
+    def test_no_payload_returns_none(self):
+        """Test that messages without payload return None."""
         msg = (2, "msg-fallback", "StatusNotification")
         raw = str(msg)
         result = get_transaction_id(raw)
-        assert result == "msg-fallback"
+        # No dict payload, so returns None
+        assert result is None
 
-    def test_invalid_message_returns_none(self, sample_invalid_message):
+    def test_invalid_message_returns_none(self):
         """Test that invalid messages return None."""
-        result = get_transaction_id(sample_invalid_message)
+        result = get_transaction_id("not a valid tuple")
         assert result is None
 
     def test_empty_string_returns_none(self):
@@ -314,166 +243,109 @@ class TestGetTransactionId:
         result = get_transaction_id("")
         assert result is None
 
-    def test_short_message_returns_none(self, sample_short_message):
+    def test_short_message_returns_none(self):
         """Test that short messages return None."""
-        raw = str(sample_short_message)
+        msg = (1, "msg-short")
+        raw = str(msg)
         result = get_transaction_id(raw)
         assert result is None
 
 
 # =============================================================================
-# Tests for update_session
+# Tests for additional parsing functions
 # =============================================================================
-class TestUpdateSession:
-    """Tests for the update_session function."""
+class TestParsingFunctions:
+    """Additional tests for all parsing functions."""
 
-    def _create_dataframe(self, messages: List[Tuple]) -> pd.DataFrame:
-        """Helper to create a DataFrame with 'message' column."""
-        data = [{"message": str(msg)} for msg in messages]
-        return pd.DataFrame(data)
+    def test_parse_action_start_transaction(self):
+        """Test parsing StartTransaction action."""
+        msg = '[2, "charger1", "StartTransaction", {"transactionId": "txn123"}]'
+        assert parse_action(msg) == "StartTransaction"
 
-    def test_new_session_initialization(self):
-        """Test that a new session state is initialized correctly."""
-        key = ("charger-001", "tx-001")
-        df = self._create_dataframe([])
-        mock_state = MockGroupState()
-        
-        # Create a generator from the function
-        gen = update_session(key, df, mock_state)
-        results = list(gen)
-        
-        # After processing empty df, state should exist
-        assert mock_state.exists()
-        state_data = mock_state.get()
-        assert state_data["chargerId"] == "charger-001"
-        assert state_data["status"] == "active"
-        assert state_data["eventCount"] == 0
+    def test_parse_action_meter_values(self):
+        """Test parsing MeterValues action."""
+        msg = '[2, "charger1", "MeterValues", {"power": 22.5}]'
+        assert parse_action(msg) == "MeterValues"
 
-    def test_meter_values_updates_state(self, sample_meter_values_message):
-        """Test that MeterValues updates the session state."""
-        key = ("charger-001", "tx-001")
-        df = self._create_dataframe([sample_meter_values_message])
-        mock_state = MockGroupState()
-        
-        gen = update_session(key, df, mock_state)
-        results = list(gen)
-        
-        assert mock_state.exists()
-        state_data = mock_state.get()
-        assert state_data["eventCount"] == 1
-        assert state_data["power_values"] == [2200.5, 2300.0]
-        assert state_data["startTime"] is not None
-        assert state_data["endTime"] is not None
+    def test_parse_action_stop_transaction(self):
+        """Test parsing StopTransaction action."""
+        msg = '[2, "charger1", "StopTransaction", {"reason": "Done"}]'
+        assert parse_action(msg) == "StopTransaction"
 
-    def test_stop_transaction_yields_result(self, sample_meter_values_message, sample_stop_transaction_message):
-        """Test that StopTransaction yields a result tuple."""
-        key = ("charger-001", "tx-001")
-        
-        # First add MeterValues, then StopTransaction
-        messages = [sample_meter_values_message, sample_stop_transaction_message]
-        df = self._create_dataframe(messages)
-        mock_state = MockGroupState()
-        
-        gen = update_session(key, df, mock_state)
-        results = list(gen)
-        
-        # Should yield exactly one result
-        assert len(results) == 1
-        result = results[0]
-        
-        # Result is a tuple of 9 elements
-        assert len(result) == 9
-        session_id, station_id, status, start_time, end_time, duration, energy, event_count, termination_reason = result
-        
-        assert station_id == "charger-001"
-        assert status == "ended"
-        assert termination_reason == "EVDriver"
-        assert event_count == 2  # MeterValues + StopTransaction
-        assert duration >= 0
-        assert energy >= 0
+    def test_parse_action_remote_stop(self):
+        """Test parsing RemoteStopTransaction action."""
+        msg = '[2, "charger1", "RemoteStopTransaction", {}]'
+        assert parse_action(msg) == "RemoteStopTransaction"
 
-    def test_status_notification_increments_count(self, sample_status_notification_message):
-        """Test that StatusNotification increments event count."""
-        key = ("charger-001", "tx-001")
-        df = self._create_dataframe([sample_status_notification_message])
-        mock_state = MockGroupState()
-        
-        gen = update_session(key, df, mock_state)
-        results = list(gen)
-        
-        assert mock_state.exists()
-        state_data = mock_state.get()
-        assert state_data["eventCount"] == 1
+    def test_get_transaction_id(self):
+        """Test extracting transactionId."""
+        msg = '[2, "charger1", "StartTransaction", {"transactionId": "txn123"}]'
+        assert get_transaction_id(msg) == "txn123"
 
-    def test_heartbeat_increments_count(self, sample_heartbeat_message):
-        """Test that Heartbeat increments event count."""
-        key = ("charger-001", "tx-001")
-        df = self._create_dataframe([sample_heartbeat_message])
-        mock_state = MockGroupState()
-        
-        gen = update_session(key, df, mock_state)
-        results = list(gen)
-        
-        assert mock_state.exists()
-        state_data = mock_state.get()
-        assert state_data["eventCount"] == 1
+    def test_parse_timestamp_meter_values(self):
+        """Test parsing timestamp from MeterValues."""
+        msg = '[2, "charger1", "MeterValues", {"meterValue": [{"timestamp": "2025-01-01T10:00:00Z"}]}]'
+        result = parse_timestamp(msg)
+        assert result == "2025-01-01T10:00:00+00:00"
 
-    def test_existing_state_is_used(self):
-        """Test that existing state is retrieved and updated."""
-        key = ("charger-001", "tx-001")
-        df = self._create_dataframe([])
-        
-        initial_state = {
-            "chargerId": "charger-001",
-            "startTime": "2024-01-15T10:00:00",
-            "endTime": "2024-01-15T10:30:00",
-            "power_values": [100.0, 200.0],
-            "eventCount": 5,
-            "status": "active",
-            "terminationReason": None
-        }
-        mock_state = MockGroupState(initial_state)
-        
-        gen = update_session(key, df, mock_state)
-        results = list(gen)
-        
-        # State should still exist with same data
-        assert mock_state.exists()
-        state_data = mock_state.get()
-        assert state_data["eventCount"] == 5  # No change from empty df
+    def test_parse_timestamp_start_transaction(self):
+        """Test parsing timestamp from StartTransaction."""
+        msg = '[2, "charger1", "StartTransaction", {"timestamp": "2025-01-01T10:00:00Z"}]'
+        result = parse_timestamp(msg)
+        assert result == "2025-01-01T10:00:00+00:00"
 
-    def test_invalid_messages_are_skipped(self, sample_invalid_message):
-        """Test that invalid messages are skipped without error."""
-        key = ("charger-001", "tx-001")
-        df = self._create_dataframe([("invalid",)])  # This will fail parse_ocpp_message
-        mock_state = MockGroupState()
-        
-        # Should not raise an exception
-        gen = update_session(key, df, mock_state)
-        results = list(gen)
-        
-        # State should exist but with 0 eventCount (message was skipped)
-        assert mock_state.exists()
-        state_data = mock_state.get()
-        assert state_data["eventCount"] == 0
+    def test_parse_power(self):
+        """Test parsing power value."""
+        msg = '[2, "charger1", "MeterValues", {"meterValue": [{"sampledValue": [{"measurand": "Power.Active.Import", "value": "22.5"}]}]}]'
+        assert parse_power(msg) == 22.5
 
-    def test_multiple_messages_in_sequence(self, sample_meter_values_message, sample_stop_transaction_message):
-        """Test processing multiple messages in sequence."""
-        key = ("charger-001", "tx-001")
-        
-        # Create a sequence: MeterValues, MeterValues, StopTransaction
-        messages = [
-            sample_meter_values_message,
-            sample_meter_values_message,  # Same message again
-            sample_stop_transaction_message
-        ]
-        df = self._create_dataframe(messages)
-        mock_state = MockGroupState()
-        
-        gen = update_session(key, df, mock_state)
-        results = list(gen)
-        
-        assert len(results) == 1  # One result from StopTransaction
-        result = results[0]
-        assert result[2] == "ended"  # status
-        assert result[7] == 3  # eventCount: 2 MeterValues + 1 StopTransaction
+    def test_parse_meter_start(self):
+        """Test parsing meterStart value."""
+        msg = '[2, "321", "StartTransaction", {"transactionId": "txn123", "meterStart": 1000, "timestamp": "2025-01-01T10:00:00Z"}]'
+        assert parse_meter_start(msg) == 1000
+
+    def test_parse_meter_stop(self):
+        """Test parsing meterStop value."""
+        msg = '[2, "322", "StopTransaction", {"transactionId": "txn123", "meterStop": 1500, "timestamp": "2025-01-01T10:05:00Z"}]'
+        assert parse_meter_stop(msg) == 1500
+
+    def test_parse_id_tag(self):
+        """Test parsing idTag value."""
+        msg = '[2, "321", "StartTransaction", {"idTag": "RFID123", "timestamp": "2025-01-01T10:00:00Z"}]'
+        assert parse_id_tag(msg) == "RFID123"
+
+    def test_parse_connector_id(self):
+        """Test parsing connectorId value."""
+        msg = '[2, "321", "StartTransaction", {"connectorId": 1, "timestamp": "2025-01-01T10:00:00Z"}]'
+        assert parse_connector_id(msg) == 1
+
+    def test_parse_soc(self):
+        """Test parsing SOC value."""
+        msg = '[2, "321", "MeterValues", {"meterValue": [{"sampledValue": [{"measurand": "Battery.SOC", "value": 75}]}]}]'
+        assert parse_soc(msg) == 75.0
+
+    def test_parse_voltage(self):
+        """Test parsing voltage value."""
+        msg = '[2, "321", "MeterValues", {"meterValue": [{"sampledValue": [{"measurand": "Voltage", "value": 230}]}]}]'
+        assert parse_voltage(msg) == 230.0
+
+    def test_parse_reason(self):
+        """Test parsing reason value."""
+        msg = '[2, "charger1", "StopTransaction", {"transactionId": "txn123", "reason": "EVDriver"}]'
+        assert parse_reason(msg) == "EVDriver"
+
+    def test_is_stop_action_stop_transaction(self):
+        """Test is_stop_action for StopTransaction."""
+        assert is_stop_action("StopTransaction") == True
+
+    def test_is_stop_action_remote_stop(self):
+        """Test is_stop_action for RemoteStopTransaction."""
+        assert is_stop_action("RemoteStopTransaction") == True
+
+    def test_is_stop_action_meter_values(self):
+        """Test is_stop_action for MeterValues."""
+        assert is_stop_action("MeterValues") == False
+
+    def test_is_stop_action_start_transaction(self):
+        """Test is_stop_action for StartTransaction."""
+        assert is_stop_action("StartTransaction") == False

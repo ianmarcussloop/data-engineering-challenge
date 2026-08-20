@@ -1,0 +1,3 @@
+- uv for python dependency management
+- docker for?
+- 

@@ -1,0 +1,3 @@
+- Mistral AI tends to suggest latest version of softwares, suggesting experimental features such as GroupState. Is important to question if the AI is overkilling with the solution
+- Kafka compacted topics are perfect for stateful rows. If a key/value pair is written in with a `null`for the value, the whole key/value pair is removed from the compacted topic
+- Mistral AI struggles to commit to TDD development, wants to race ahead and write the code without the proper test cycle, and thinks it has written all of the tests when it hasn't yet
