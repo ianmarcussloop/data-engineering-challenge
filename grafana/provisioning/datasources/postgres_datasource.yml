@@ -5,12 +5,15 @@ datasources:
     type: postgres
     access: proxy
     url: postgres:5432
-    database: ev_coorp
     user: ev_user
+    database: ev_coorp
     secureJsonData:
       password: ev_password
     jsonData:
       sslmode: disable
       postgresVersion: 1400
+      database: ev_coorp
       postgresDefaultSchema: ocpp
+      # Ensure database is set in both places for compatibility
+      defaultDatabase: ev_coorp
     editable: true
