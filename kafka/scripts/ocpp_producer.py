@@ -7,7 +7,7 @@ import re
 # --- Configuration ---
 KAFKA_BROKER = os.getenv("KAFKA_BROKER", "localhost:9092")
 TOPIC_NAME = "ocpp.messages"
-TXT_FILE_PATH = "ocpp-sample-data.txt"
+TXT_FILE_PATH = "ocpp-data-many-chargers.txt"
 
 # --- Parse .txt File ---
 def parse_txt_file(file_path):

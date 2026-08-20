@@ -24,20 +24,41 @@ SCHEMA_DEFINITION = {
 def create_kafka_topic():
     admin_client = AdminClient({"bootstrap.servers": KAFKA_BROKER})
 
-    # Check if topic already exists
-    topic_metadata = admin_client.list_topics(timeout=10)
-    if TOPIC_NAME in topic_metadata.topics:
-        print(f"⚠️ Topic {TOPIC_NAME} already exists.")
-        return
-
-    # Create the topic
-    new_topic = NewTopic(
-        TOPIC_NAME,
-        num_partitions=1,
-        replication_factor=1,
-    )
-    admin_client.create_topics([new_topic])
-    print(f"✅ Created Kafka topic: {TOPIC_NAME}")
+    # Define all topics to create
+    topics = [
+        # Main raw OCPP messages topic
+        ("ocpp.messages", 1, 1, {}),
+        # Test raw OCPP messages topic
+        ("ocpp.messages_test", 1, 1, {}),
+        
+        # NEW: Normalized topic - all processed messages for ACTIVE sessions only
+        ("ocpp.active.raw", 10, 1, {
+            "cleanup.policy": "compact",
+            "retention.ms": "259200000",  # 3 days - short for active debugging
+            "segment.ms": "60000",
+            "min.compaction.lag.ms": "1000"
+        }),
+        
+        # NEW: Compacted topic for ACTIVE sessions ONLY
+        ("ocpp.active", 10, 1, {
+            "cleanup.policy": "compact",
+            "segment.ms": "60000",           # 1 minute
+            "min.compaction.lag.ms": "1000" # Allow consumers 1s to catch up
+        })
+    ]
+    
+    for topic_name, num_partitions, replication_factor, configs in topics:
+        if topic_name in admin_client.list_topics(timeout=10).topics:
+            print(f"Topic {topic_name} already exists.")
+        else:
+            new_topic = NewTopic(
+                topic_name,
+                num_partitions=num_partitions,
+                replication_factor=replication_factor,
+                config=configs
+            )
+            admin_client.create_topics([new_topic])
+            print(f"Created Kafka topic: {topic_name}")
 
 # TODO: add recreate_kafka_topic() function to delete and recreate the topic if needed? 
 
@@ -51,18 +72,22 @@ def register_schema():
         schema_str=json.dumps(SCHEMA_DEFINITION)
     )
 
-    try:
-        # Register the schema using the Schema object
-        schema_id = schema_registry.register_schema(
-            subject_name=SCHEMA_SUBJECT,
-            schema=schema
-        )
-        print(f"✅ Registered schema for {SCHEMA_SUBJECT} (ID: {schema_id})")
-    except Exception as e:
-        if "already exists" in str(e):
-            print(f"⚠️ Schema for {SCHEMA_SUBJECT} already exists.")
-        else:
-            print(f"❌ Failed to register schema: {e}")
+    # List of subjects to register
+    subjects = ["ocpp.messages-value", "ocpp.messages_test-value"]
+    
+    for subject in subjects:
+        try:
+            # Register the schema using the Schema object
+            schema_id = schema_registry.register_schema(
+                subject_name=subject,
+                schema=schema
+            )
+            print(f"✅ Registered schema for {subject} (ID: {schema_id})")
+        except Exception as e:
+            if "already exists" in str(e):
+                print(f"⚠️ Schema for {subject} already exists.")
+            else:
+                print(f"❌ Failed to register schema for {subject}: {e}")
 
 # --- Main ---
 if __name__ == "__main__":

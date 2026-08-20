@@ -12,4 +12,5 @@ datasources:
     jsonData:
       sslmode: disable
       postgresVersion: 1400
+      postgresDefaultSchema: ocpp
     editable: true
