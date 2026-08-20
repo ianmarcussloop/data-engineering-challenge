@@ -11,10 +11,17 @@
             "id": "217871eb269c8016",
             "type": "leaf",
             "state": {
-              "type": "empty",
-              "state": {},
-              "icon": "lucide-file",
-              "title": "New tab"
+              "type": "canvas",
+              "state": {
+                "file": "Obsidian Vault/Hivemind Data Engineering Challenge/Architecture.canvas",
+                "viewState": {
+                  "x": 62.5,
+                  "y": 255,
+                  "zoom": -0.20991201927798514
+                }
+              },
+              "icon": "lucide-layout-dashboard",
+              "title": "Architecture"
             }
           }
         ]
