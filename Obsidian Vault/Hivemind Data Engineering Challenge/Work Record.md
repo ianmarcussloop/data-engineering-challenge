@@ -9,4 +9,6 @@
 | 5.8  | - Create unit tests<br>- Implement Spark                                                                            | 0,5   |
 | 17.8 | - Get Spark working                                                                                                 | 4     |
 | 18.8 | - Determine detailed kafka topic schemas                                                                            | 3     |
-| 19.8 | - Write all various kinds of tests                                                                                  | 3     |
+| 19.8 | - Write all various kinds of tests                                                                                  | 4     |
+| 20.8 | - Improve test architecture<br>- add data cleaning<br>- cleanup                                                     | 5     |
+| 21.8 | - get tests working<br>- get grafana stable<br>- add sensible queries to grafana dashboards                         | 3     |

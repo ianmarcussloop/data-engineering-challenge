@@ -1,12 +1,12 @@
 {
 	"nodes":[
-		{"id":"c3d9d9a0585281f3","type":"group","x":60,"y":360,"width":360,"height":180,"label":"Same dashboard"},
+		{"id":"c3d9d9a0585281f3","type":"group","x":60,"y":360,"width":360,"height":180,"label":"Grafana"},
 		{"id":"736d0e5dacd3d934","type":"text","text":"blablub","x":-125,"y":-30,"width":250,"height":60},
-		{"id":"d1da879b55f11e47","type":"text","text":"OCPP Kafka Producer\n\n- `ocpp-data-many-chargers.txt`\n- `ocpp-data-many-days.txt`","x":-175,"y":-30,"width":355,"height":150},
-		{"id":"49b4af2952fb2747","type":"text","text":"Short Term Storage\n- Kafka Topic `ocpp.messages`","x":-140,"y":180,"width":285,"height":118},
+		{"id":"49b4af2952fb2747","type":"text","text":"Short Term Storage\n- Kafka Topics \n\t- `ocpp.messages`\n\t- `ocpp.active`\n\t- `ocpp.active.raw`\n\t- `ocpp.malformed`","x":-140,"y":120,"width":285,"height":200},
 		{"id":"ab5293ed33139c63","type":"text","text":"Real-time / Stateful Dashboard (Kafka)","x":80,"y":380,"width":320,"height":54},
 		{"id":"03711d827c6682f7","type":"text","text":"Historical Dashboard (PostgreSQL)","x":80,"y":458,"width":320,"height":60},
-		{"id":"72c21f9856a59a49","type":"text","text":"Long Term Storage\n- `ocpp.history` table","x":-295,"y":407,"width":240,"height":114}
+		{"id":"72c21f9856a59a49","type":"text","text":"Long Term Storage\n- `ocpp.history` table","x":-295,"y":407,"width":240,"height":114},
+		{"id":"d1da879b55f11e47","type":"text","text":"OCPP Kafka Producer\n\n- `ocpp-data-many-chargers.txt`\n- `ocpp-data-many-days.txt`","x":-175,"y":-75,"width":355,"height":150}
 	],
 	"edges":[
 		{"id":"0d47c59dc0abfce7","fromNode":"49b4af2952fb2747","fromSide":"bottom","toNode":"72c21f9856a59a49","toSide":"top"},

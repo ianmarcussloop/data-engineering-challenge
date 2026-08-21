@@ -23,3 +23,4 @@
 - should `uv run python spark/scripts/spark_kafka_to_postgres.py` run on something like a kubernetes cluster or something so that it can survive restarts?
 - write some sql views that organise across time and chargers (and various sites in the future?)
 - do a manual math check of the totalEnergyConsumed, maxPower, avgPower, etc.
+- we could add a voltage min/max?
