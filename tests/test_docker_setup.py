@@ -43,29 +43,28 @@ class TestDockerSetup:
         conn = psycopg2.connect(TEST_POSTGRES_URL, connect_timeout=5)
         cursor = conn.cursor()
         
-        # Check table exists
+        # Check table exists in ocpp schema
         cursor.execute("""
             SELECT "table_name" FROM information_schema.tables 
-            WHERE "table_schema" = 'public' AND "table_name" = 'ocpp.history'
+            WHERE "table_schema" = 'ocpp' AND "table_name" = 'history'
         """)
         result = cursor.fetchone()
-        assert result is not None, "ocpp.history table should exist"
+        assert result is not None, "ocpp.history table should exist in ocpp schema"
         
-        # Check required columns (PostgreSQL stores them as lowercase)
+        # Check required columns (camelCase as per schema)
         cursor.execute("""
             SELECT "column_name" FROM information_schema.columns 
-            WHERE "table_schema" = 'public' AND "table_name" = 'ocpp.history'
+            WHERE "table_schema" = 'ocpp' AND "table_name" = 'history'
         """)
         columns = [row[0] for row in cursor.fetchall()]
         
-        # PostgreSQL converts to lowercase, so check lowercase versions
         required_fields = [
             "sessionId", "stationId", "transactionId", "startTime", "endTime",
             "duration", "terminationReason", "totalEnergyConsumed",
             "meterStart", "meterStop", "idTag"
         ]
         for field in required_fields:
-            assert field in columns, f"ocpp.history table should have {field} column"
+            assert field in columns, f"ocpp.history table should have {field} column, has: {columns}"
         
         conn.close()
     
