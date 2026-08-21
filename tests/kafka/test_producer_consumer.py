@@ -163,6 +163,9 @@ class TestOCPPMessageConsumption:
         producer.produce("ocpp.active", key=session_id, value=json.dumps(msg))
         producer.flush(timeout=5)
         
+        # Give the message time to be written
+        time.sleep(2)
+        
         # Consume with key and unique group
         consumer = Consumer({
             "bootstrap.servers": TEST_KAFKA_BROKER,
@@ -172,13 +175,23 @@ class TestOCPPMessageConsumption:
         })
         consumer.subscribe(["ocpp.active"])
         
-        consumed_msg = consumer.poll(timeout=5)
+        # Poll multiple times to find our specific message
+        found_our_message = False
+        for _ in range(20):
+            consumed_msg = consumer.poll(timeout=1)
+            if consumed_msg is None:
+                break
+            if consumed_msg.key() == session_id.encode('utf-8'):
+                # Check the value contains our session_id
+                value = json.loads(consumed_msg.value().decode('utf-8'))
+                if value.get("sessionId") == session_id:
+                    found_our_message = True
+                    break
+        
         consumer.close()
         
-        # We should get the message we just produced
-        if consumed_msg is not None:
-            assert consumed_msg.key() == session_id.encode('utf-8')
-            assert consumed_msg.value() is not None
+        # We should have found our message
+        assert found_our_message, f"Did not find message with key {session_id} in ocpp.active"
 
 
 class TestOCPPMessageFormat:
