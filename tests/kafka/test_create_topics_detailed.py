@@ -110,7 +110,7 @@ class TestCreateTopicsIntegration:
         # These are the topic configurations from create_topics.py
         topic_configs = [
             ("ocpp.messages", 1, 1, {}),
-            ("ocpp.messages_test", 1, 1, {}),
+            ("ocpp.messages", 1, 1, {}),
             ("ocpp.active.raw", 10, 1, {
                 "cleanup.policy": "compact",
                 "retention.ms": "259200000",

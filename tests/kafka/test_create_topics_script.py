@@ -36,12 +36,12 @@ class TestCreateTopicsScript:
         assert "Error" not in result.stderr or "already exists" in result.stderr
 
     def test_script_creates_ocpp_messages_topic(self):
-        """The script should create ocpp.messages and ocpp.messages_test topics."""
+        """The script should create ocpp.messages and ocpp.messages topics."""
         admin = AdminClient({"bootstrap.servers": TEST_KAFKA_BROKER})
         topics = admin.list_topics(timeout=5).topics
         
         assert "ocpp.messages" in topics
-        assert "ocpp.messages_test" in topics
+        assert "ocpp.messages" in topics
 
     def test_script_creates_ocpp_active_topic(self):
         """The script should create ocpp.active topic."""
@@ -80,7 +80,7 @@ class TestCreateTopicsFunction:
         topics = admin.list_topics(timeout=5).topics
         
         assert "ocpp.messages" in topics
-        assert "ocpp.messages_test" in topics
+        assert "ocpp.messages" in topics
         assert "ocpp.active" in topics
         assert "ocpp.active.raw" in topics
 
@@ -107,7 +107,7 @@ class TestTopicRecreation:
 class TestTopicDeletionAndRecreation:
     """Test that topics can be deleted and recreated."""
 
-    def test_delete_and_recreate_test_topic(self):
+    def test_delete_and_recreate_topic(self):
         """Should be able to delete and recreate a test topic."""
         admin = AdminClient({"bootstrap.servers": TEST_KAFKA_BROKER})
         

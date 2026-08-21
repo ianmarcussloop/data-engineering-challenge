@@ -77,7 +77,7 @@ class TestDockerSetup:
         cursor.execute("""
             SELECT "indexname", "indexdef" 
             FROM pg_indexes 
-            WHERE "tablename" = 'history' AND "schemaname" = 'ocpp'
+            WHERE "tablename" = 'ocpp.history' AND "schemaname" = 'public'
         """)
         indexes = {row[0]: row[1] for row in cursor.fetchall()}
         

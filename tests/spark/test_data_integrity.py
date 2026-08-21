@@ -23,7 +23,6 @@ from tests.fixtures.ocpp_messages import start_transaction, meter_values, stop_t
 TEST_POSTGRES_URL = os.environ.get("TEST_POSTGRES_URL", "postgresql://ev_user:ev_password@localhost:5432/ev_coorp")
 
 
-@pytest.mark.postgres
 class TestDataIntegrityFields:
     """Test that all required fields are populated in PostgreSQL."""
 
@@ -33,7 +32,7 @@ class TestDataIntegrityFields:
         cursor = conn.cursor()
         
         # Get a session from the database
-        cursor.execute('SELECT * FROM "ocpp"."history" LIMIT 1')
+        cursor.execute("SELECT * FROM ocpp.history LIMIT 1")
         row = cursor.fetchone()
         
         assert row is not None, "No sessions in ocpp.history table yet - Spark pipeline may not be running or has not processed any data"
@@ -43,7 +42,7 @@ class TestDataIntegrityFields:
         columns = [col[0] for col in cursor.fetchall()]
         session = dict(zip(columns, row))
         
-        # Check required fields are not None (use camelCase for PostgreSQL column names)
+        # Check required fields are not None (use lowercase for PostgreSQL column names)
         required_fields = [
             "sessionId",
             "stationId",
@@ -63,7 +62,7 @@ class TestDataIntegrityFields:
         conn = psycopg2.connect(TEST_POSTGRES_URL, connect_timeout=5)
         cursor = conn.cursor()
         
-        cursor.execute('SELECT "meterStart", "meterStop" FROM "ocpp"."history" WHERE "meterStart" IS NOT NULL LIMIT 1')
+        cursor.execute('SELECT "meterStart", "meterStop" FROM ocpp.history WHERE "meterStart" IS NOT NULL LIMIT 1')
         row = cursor.fetchone()
         
         assert row is not None, "No sessions with meter values in ocpp.history table yet - Spark pipeline may not have processed complete sessions"
@@ -82,7 +81,7 @@ class TestDataIntegrityFields:
         
         cursor.execute("""
             SELECT "totalEnergyConsumed", "avgPower", "duration" 
-            FROM "ocpp"."history" 
+            FROM ocpp.history 
             WHERE "totalEnergyConsumed" IS NOT NULL 
             AND "avgPower" IS NOT NULL 
             AND "duration" IS NOT NULL 
@@ -108,7 +107,7 @@ class TestDataIntegrityFields:
         
         cursor.execute("""
             SELECT "duration", "startTime", "endTime" 
-            FROM "ocpp"."history" 
+            FROM ocpp.history 
             WHERE "duration" IS NOT NULL 
             AND "startTime" IS NOT NULL 
             AND "endTime" IS NOT NULL 
@@ -134,7 +133,6 @@ class TestDataIntegrityFields:
         conn.close()
 
 
-@pytest.mark.postgres
 class TestDataIntegrityTypes:
     """Test that data types are correct in PostgreSQL."""
 
@@ -143,7 +141,7 @@ class TestDataIntegrityTypes:
         conn = psycopg2.connect(TEST_POSTGRES_URL, connect_timeout=5)
         cursor = conn.cursor()
         
-        cursor.execute('SELECT "sessionId" FROM "ocpp"."history" LIMIT 1')
+        cursor.execute('SELECT "sessionId" FROM ocpp.history LIMIT 1')
         row = cursor.fetchone()
         
         if row is not None:
@@ -156,7 +154,7 @@ class TestDataIntegrityTypes:
         conn = psycopg2.connect(TEST_POSTGRES_URL, connect_timeout=5)
         cursor = conn.cursor()
         
-        cursor.execute('SELECT "duration" FROM "ocpp"."history" WHERE "duration" IS NOT NULL LIMIT 1')
+        cursor.execute('SELECT "duration" FROM ocpp.history WHERE "duration" IS NOT NULL LIMIT 1')
         row = cursor.fetchone()
         
         if row is not None:
@@ -169,7 +167,7 @@ class TestDataIntegrityTypes:
         conn = psycopg2.connect(TEST_POSTGRES_URL, connect_timeout=5)
         cursor = conn.cursor()
         
-        cursor.execute('SELECT "totalEnergyConsumed" FROM "ocpp"."history" WHERE "totalEnergyConsumed" IS NOT NULL LIMIT 1')
+        cursor.execute('SELECT "totalEnergyConsumed" FROM ocpp.history WHERE "totalEnergyConsumed" IS NOT NULL LIMIT 1')
         row = cursor.fetchone()
         
         if row is not None:

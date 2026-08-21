@@ -70,36 +70,35 @@ def setup_test_infrastructure():
         
         if result is None:
             # Create the table in the ocpp schema to match production
-            # Use quoted identifiers to preserve camelCase column names
             conn.execute(text("""
-                CREATE TABLE "ocpp"."history" (
-                    "sessionId" TEXT PRIMARY KEY,
-                    "stationId" TEXT NOT NULL,
-                    "transactionId" TEXT NOT NULL,
-                    "startTime" TIMESTAMP NOT NULL,
-                    "endTime" TIMESTAMP NOT NULL,
-                    "duration" INTEGER NOT NULL,
-                    "terminationReason" TEXT,
-                    "totalEnergyConsumed" FLOAT,
-                    "avgPower" FLOAT,
-                    "maxPower" FLOAT,
-                    "idTag" TEXT,
-                    "connectorId" INTEGER,
-                    "meterStart" INTEGER,
-                    "meterStop" INTEGER,
-                    "socStart" FLOAT,
-                    "socEnd" FLOAT,
-                    "voltageAvg" FLOAT,
-                    "eventCount" INTEGER DEFAULT 0
+                CREATE TABLE ocpp.history (
+                    sessionId TEXT PRIMARY KEY,
+                    stationId TEXT NOT NULL,
+                    transactionId TEXT NOT NULL,
+                    startTime TIMESTAMP NOT NULL,
+                    endTime TIMESTAMP NOT NULL,
+                    duration INTEGER NOT NULL,
+                    terminationReason TEXT,
+                    totalEnergyConsumed FLOAT,
+                    avgPower FLOAT,
+                    maxPower FLOAT,
+                    idTag TEXT,
+                    connectorId INTEGER,
+                    meterStart INTEGER,
+                    meterStop INTEGER,
+                    socStart FLOAT,
+                    socEnd FLOAT,
+                    voltageAvg FLOAT,
+                    eventCount INTEGER DEFAULT 0
                 )
             """))
             
-            # Create indexes on camelCase columns
-            conn.execute(text('CREATE INDEX IF NOT EXISTS idx_ocpp_history_stationId ON "ocpp"."history" ("stationId")'))
-            conn.execute(text('CREATE INDEX IF NOT EXISTS idx_ocpp_history_transactionId ON "ocpp"."history" ("transactionId")'))
-            conn.execute(text('CREATE INDEX IF NOT EXISTS idx_ocpp_history_startTime ON "ocpp"."history" ("startTime")'))
-            conn.execute(text('CREATE INDEX IF NOT EXISTS idx_ocpp_history_endTime ON "ocpp"."history" ("endTime")'))
-            conn.execute(text('CREATE INDEX IF NOT EXISTS idx_ocpp_history_terminationReason ON "ocpp"."history" ("terminationReason")'))
+            # Create indexes
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_ocpp_history_stationid ON ocpp.history (stationId)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_ocpp_history_transactionid ON ocpp.history (transactionId)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_ocpp_history_starttime ON ocpp.history (startTime)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_ocpp_history_endtime ON ocpp.history (endTime)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_ocpp_history_terminationreason ON ocpp.history (terminationReason)"))
             
             conn.commit()
             print("Created PostgreSQL table: ocpp.history")

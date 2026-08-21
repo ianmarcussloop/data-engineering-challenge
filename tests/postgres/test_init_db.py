@@ -37,34 +37,34 @@ class TestSchemaModels:
         assert OcppHistory.__tablename__ == "ocpp.history"
 
     def test_models_have_required_fields(self):
-        """Test that models have required fields (snake_case Python attributes, camelCase DB columns)."""
+        """Test that models have required fields."""
         from postgres.schema.charger_session import ChargerSession
         from postgres.schema.ocpp_history import OcppHistory
         from sqlmodel import Field
         
-        # Check ChargerSession fields (still using camelCase for now)
+        # Check ChargerSession fields
         assert hasattr(ChargerSession, "sessionId")
         assert hasattr(ChargerSession, "stationId")
         assert hasattr(ChargerSession, "startTime")
         assert hasattr(ChargerSession, "status")
         
-        # Check OcppHistory fields (snake_case Python attributes map to camelCase DB columns)
-        assert hasattr(OcppHistory, "session_id")
-        assert hasattr(OcppHistory, "station_id")
-        assert hasattr(OcppHistory, "transaction_id")
-        assert hasattr(OcppHistory, "start_time")
-        assert hasattr(OcppHistory, "end_time")
+        # Check OcppHistory fields
+        assert hasattr(OcppHistory, "sessionId")
+        assert hasattr(OcppHistory, "stationId")
+        assert hasattr(OcppHistory, "transactionId")
+        assert hasattr(OcppHistory, "startTime")
+        assert hasattr(OcppHistory, "endTime")
         assert hasattr(OcppHistory, "duration")
         
         # Check optional fields in OcppHistory
-        assert hasattr(OcppHistory, "total_energy_consumed")
-        assert hasattr(OcppHistory, "avg_power")
-        assert hasattr(OcppHistory, "max_power")
-        assert hasattr(OcppHistory, "meter_start")
-        assert hasattr(OcppHistory, "meter_stop")
-        assert hasattr(OcppHistory, "soc_start")
-        assert hasattr(OcppHistory, "soc_end")
-        assert hasattr(OcppHistory, "voltage_avg")
+        assert hasattr(OcppHistory, "totalEnergyConsumed")
+        assert hasattr(OcppHistory, "avgPower")
+        assert hasattr(OcppHistory, "maxPower")
+        assert hasattr(OcppHistory, "meterStart")
+        assert hasattr(OcppHistory, "meterStop")
+        assert hasattr(OcppHistory, "socStart")
+        assert hasattr(OcppHistory, "socEnd")
+        assert hasattr(OcppHistory, "voltageAvg")
 
 
 class TestConfiguration:
@@ -131,8 +131,6 @@ class TestDatabaseIntegration:
     They will be skipped if the database is not available.
     """
 
-    @pytest.mark.postgres
-    @pytest.mark.integration
     def test_create_tables_with_real_db(self):
         """Test create_tables with a real database connection."""
         pytest.importorskip("psycopg2")

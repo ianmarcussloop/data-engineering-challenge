@@ -8,7 +8,7 @@ import os
 # --- Configuration ---
 KAFKA_BROKER = os.getenv("KAFKA_BROKER", "localhost:9092")  # Use "kafka:29092" if running in Docker
 SCHEMA_REGISTRY_URL = os.getenv("SCHEMA_REGISTRY_URL", "http://localhost:8081")  # Use "http://schema-registry:8081" if running in Docker
-TOPIC_NAME = "ocpp.messages_test"
+TOPIC_NAME = "ocpp.messages"
 SCHEMA_SUBJECT = f"{TOPIC_NAME}-value"
 
 # --- Schema Definition (must match the registered schema) ---

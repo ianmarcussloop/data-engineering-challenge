@@ -4,21 +4,23 @@ from confluent_kafka.admin import AdminClient, NewTopic
 from sqlalchemy import create_engine, text
 import time
 
-KAFKA_BROKER = "localhost:9092"
-POSTGRES_URL = "postgresql://ev_user:ev_password@localhost:5432/ev_coorp"
+import os
+
+KAFKA_BROKER = os.environ.get("TEST_KAFKA_BROKER", "localhost:9092")
+POSTGRES_URL = os.environ.get("TEST_POSTGRES_URL", "postgresql://ev_user:ev_password@localhost:5432/ev_coorp")
 
 def create_test_kafka_topics():
-    """Create test Kafka topics."""
+    """Create Kafka topics."""
     admin = AdminClient({"bootstrap.servers": KAFKA_BROKER})
     
     topics_to_create = [
-        ("ocpp.messages_test", 1, 1, {}),
-        ("ocpp.active_test", 10, 1, {
+        ("ocpp.messages", 1, 1, {}),
+        ("ocpp.active", 10, 1, {
             "cleanup.policy": "compact",
             "segment.ms": "60000",
             "min.compaction.lag.ms": "1000"
         }),
-        ("ocpp.active.raw_test", 10, 1, {
+        ("ocpp.active.raw", 10, 1, {
             "cleanup.policy": "compact",
             "retention.ms": "259200000",
             "segment.ms": "60000",
@@ -42,20 +44,20 @@ def create_test_kafka_topics():
 
 
 def create_test_postgres_tables():
-    """Create test PostgreSQL table."""
+    """Create PostgreSQL tables."""
     engine = create_engine(POSTGRES_URL)
     
     with engine.connect() as conn:
-        # Check if test table already exists
+        # Check if table already exists
         result = conn.execute(text("""
             SELECT table_name FROM information_schema.tables 
-            WHERE table_schema = 'public' AND table_name = 'ocpp.history_test'
+            WHERE table_schema = 'public' AND table_name = 'ocpp_history'
         """)).fetchone()
         
         if result is None:
-            # Create the test table
+            # Create the table
             conn.execute(text("""
-                CREATE TABLE public.ocpp_history_test (
+                CREATE TABLE public.ocpp_history (
                     sessionId TEXT PRIMARY KEY,
                     stationId TEXT NOT NULL,
                     transactionId TEXT NOT NULL,
@@ -78,20 +80,20 @@ def create_test_postgres_tables():
             """))
             
             # Create indexes
-            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_ocpp_history_test_stationId ON public.ocpp_history_test (stationId)"))
-            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_ocpp_history_test_transactionId ON public.ocpp_history_test (transactionId)"))
-            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_ocpp_history_test_startTime ON public.ocpp_history_test (startTime)"))
-            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_ocpp_history_test_endTime ON public.ocpp_history_test (endTime)"))
-            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_ocpp_history_test_terminationReason ON public.ocpp_history_test (terminationReason)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_ocpp_history_stationid ON public.ocpp_history (stationId)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_ocpp_history_transactionid ON public.ocpp_history (transactionId)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_ocpp_history_starttime ON public.ocpp_history (startTime)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_ocpp_history_endtime ON public.ocpp_history (endTime)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_ocpp_history_terminationreason ON public.ocpp_history (terminationReason)"))
             
             conn.commit()
-            print("✓ Created PostgreSQL table: ocpp.history_test")
+            print("✓ Created PostgreSQL table: ocpp.history")
         else:
-            print("✓ Table ocpp.history_test already exists")
+            print("✓ Table ocpp.history already exists")
 
 
 if __name__ == "__main__":
-    print("Setting up test infrastructure...")
+    print("Setting up infrastructure...")
     create_test_kafka_topics()
     create_test_postgres_tables()
-    print("✓ Test infrastructure setup complete!")
+    print("✓ Infrastructure setup complete!")
