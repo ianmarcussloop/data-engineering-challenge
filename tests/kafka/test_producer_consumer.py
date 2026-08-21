@@ -160,27 +160,52 @@ class TestOCPPMessageConsumption:
             "runningCount": 10
         }
         
-        producer.produce("ocpp.active", key=session_id, value=json.dumps(msg))
-        producer.flush(timeout=5)
+        # Produce with callback to verify delivery
+        delivery_ok = [False]
+        def delivery_report(err, msg):
+            if err is not None:
+                print(f"Message delivery failed: {err}")
+            else:
+                delivery_ok[0] = True
+        
+        producer.produce("ocpp.active", key=session_id, value=json.dumps(msg), callback=delivery_report)
+        producer.flush(timeout=10)
+        
+        # Verify the message was delivered
+        assert delivery_ok[0], f"Message with key {session_id} was not delivered to ocpp.active"
         
         # Give the message time to be written and replicated
         time.sleep(3)
         
-        # Consume with key and unique group - use earliest to find our message
-        # Since we use a unique session_id, and the consumer group is new,
-        # it will read from the earliest uncommitted offset
+        # Consume from the specific partition where our message was written
+        # For a compacted topic, use a fresh consumer with latest offset and seek
         consumer = Consumer({
             "bootstrap.servers": TEST_KAFKA_BROKER,
             "group.id": f"test_consume_active_key_{unique_id}",
-            "auto.offset.reset": "earliest",
+            "auto.offset.reset": "latest",
             "enable.auto.commit": False
         })
+        
+        # Get the partition for our key by producing to a test topic
+        # Actually, just subscribe and seek to beginning
+        from confluent_kafka import TopicPartition
         consumer.subscribe(["ocpp.active"])
+        
+        # Wait for assignment
+        while True:
+            assignment = consumer.assignment()
+            if assignment:
+                break
+            consumer.poll(timeout=0.5)
+        
+        # Seek to earliest for all assigned partitions
+        for tp in consumer.assignment():
+            consumer.seek(TopicPartition(tp.topic, tp.partition, 0))
         
         # Poll to find our specific message
         found_our_message = False
         poll_count = 0
-        while poll_count < 50:  # Increased limit for compacted topic
+        while poll_count < 100:
             consumed_msg = consumer.poll(timeout=1)
             if consumed_msg is None:
                 poll_count += 1
