@@ -4,10 +4,17 @@ datasources:
   - name: Kafka
     type: hamedkarbasi93-kafka-datasource
     access: proxy
+    isDefault: true
+    editable: true
     jsonData:
-      bootstrapServers: "kafka:29092"  # ← Moved to jsonData, renamed
+      bootstrapServers: "kafka:29092"
       clientId: grafana
       tlsAuth: false
       saslAuth: false
-      schemaRegistryUrl: "http://schema-registry:8081"  # ← Required for Avro
-    editable: true
+      schemaRegistryUrl: "http://schema-registry:8081"
+      securityProtocol: "PLAINTEXT"
+      messageFormat: "json"
+      saslMechanisms: ""
+      saslUsername: ""
+      logLevel: "info"
+      healthcheckTimeout: 2000

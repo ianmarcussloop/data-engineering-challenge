@@ -1,7 +1,7 @@
-"""Phase 3.3: Test data integrity in PostgreSQL ocpp.history_test table.
+"""Phase 3.3: Test data integrity in PostgreSQL ocpp.history table.
 
 These tests verify that completed sessions written to PostgreSQL have all
-required fields populated correctly. They use the _test table that is auto-created
+required fields populated correctly. They use the table that is auto-created
 by conftest.py. They will FAIL initially if test infrastructure doesn't exist,
 then PASS after the Spark pipeline correctly processes and writes sessions.
 
@@ -19,8 +19,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../spark/scripts'
 # Import fixtures from the tests.fixtures module
 from tests.fixtures.ocpp_messages import start_transaction, meter_values, stop_transaction
 
-
-TEST_POSTGRES_URL = "postgresql://ev_user:ev_password@localhost:5432/ev_coorp"
+# Read from environment or use defaults
+TEST_POSTGRES_URL = os.environ.get("TEST_POSTGRES_URL", "postgresql://ev_user:ev_password@localhost:5432/ev_coorp")
 
 
 @pytest.mark.postgres
@@ -32,25 +32,24 @@ class TestDataIntegrityFields:
         conn = psycopg2.connect(TEST_POSTGRES_URL, connect_timeout=5)
         cursor = conn.cursor()
         
-        # Get a session from the database (test table)
-        cursor.execute("SELECT * FROM ocpp_history_test LIMIT 1")
+        # Get a session from the database
+        cursor.execute('SELECT * FROM "ocpp"."history" LIMIT 1')
         row = cursor.fetchone()
         
-        if row is None:
-            pytest.skip("No sessions in ocpp_history_test table yet")
+        assert row is not None, "No sessions in ocpp.history table yet - Spark pipeline may not be running or has not processed any data"
         
         # Map row to column names
-        cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'ocpp_history_test' ORDER BY ordinal_position")
+        cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_schema = 'ocpp' AND table_name = 'history' ORDER BY ordinal_position")
         columns = [col[0] for col in cursor.fetchall()]
         session = dict(zip(columns, row))
         
-        # Check required fields are not None (use lowercase for PostgreSQL column names)
+        # Check required fields are not None (use camelCase for PostgreSQL column names)
         required_fields = [
-            "sessionid",
-            "stationid",
-            "transactionid",
-            "starttime",
-            "endtime",
+            "sessionId",
+            "stationId",
+            "transactionId",
+            "startTime",
+            "endTime",
             "duration",
         ]
         
@@ -64,11 +63,10 @@ class TestDataIntegrityFields:
         conn = psycopg2.connect(TEST_POSTGRES_URL, connect_timeout=5)
         cursor = conn.cursor()
         
-        cursor.execute("SELECT meterstart, meterstop FROM ocpp_history_test WHERE meterstart IS NOT NULL LIMIT 1")
+        cursor.execute('SELECT "meterStart", "meterStop" FROM "ocpp"."history" WHERE "meterStart" IS NOT NULL LIMIT 1')
         row = cursor.fetchone()
         
-        if row is None:
-            pytest.skip("No sessions with meter values in ocpp_history_test table yet")
+        assert row is not None, "No sessions with meter values in ocpp.history table yet - Spark pipeline may not have processed complete sessions"
         
         meter_start, meter_stop = row
         assert meter_start is not None, "Session should have meterStart"
@@ -83,17 +81,16 @@ class TestDataIntegrityFields:
         cursor = conn.cursor()
         
         cursor.execute("""
-            SELECT totalenergyconsumed, avgpower, duration 
-            FROM ocpp_history_test 
-            WHERE totalenergyconsumed IS NOT NULL 
-            AND avgpower IS NOT NULL 
-            AND duration IS NOT NULL 
+            SELECT "totalEnergyConsumed", "avgPower", "duration" 
+            FROM "ocpp"."history" 
+            WHERE "totalEnergyConsumed" IS NOT NULL 
+            AND "avgPower" IS NOT NULL 
+            AND "duration" IS NOT NULL 
             LIMIT 1
         """)
         row = cursor.fetchone()
         
-        if row is None:
-            pytest.skip("No sessions with energy calculation in ocpp_history_test table yet")
+        assert row is not None, "No sessions with energy calculation in ocpp.history table yet - Spark pipeline may not have processed sessions with all required fields"
         
         total_energy, avg_power, duration = row
         
@@ -110,17 +107,16 @@ class TestDataIntegrityFields:
         cursor = conn.cursor()
         
         cursor.execute("""
-            SELECT duration, starttime, endtime 
-            FROM ocpp_history_test 
-            WHERE duration IS NOT NULL 
-            AND starttime IS NOT NULL 
-            AND endtime IS NOT NULL 
+            SELECT "duration", "startTime", "endTime" 
+            FROM "ocpp"."history" 
+            WHERE "duration" IS NOT NULL 
+            AND "startTime" IS NOT NULL 
+            AND "endTime" IS NOT NULL 
             LIMIT 1
         """)
         row = cursor.fetchone()
         
-        if row is None:
-            pytest.skip("No sessions with duration in ocpp_history_test table yet")
+        assert row is not None, "No sessions with duration in ocpp.history table yet - Spark pipeline may not have processed sessions with complete timestamps"
         
         duration, start_time, end_time = row
         
@@ -143,15 +139,15 @@ class TestDataIntegrityTypes:
     """Test that data types are correct in PostgreSQL."""
 
     def test_session_id_is_string(self):
-        """sessionid should be a string."""
+        """sessionId should be a string."""
         conn = psycopg2.connect(TEST_POSTGRES_URL, connect_timeout=5)
         cursor = conn.cursor()
         
-        cursor.execute("SELECT sessionid FROM ocpp_history_test LIMIT 1")
+        cursor.execute('SELECT "sessionId" FROM "ocpp"."history" LIMIT 1')
         row = cursor.fetchone()
         
         if row is not None:
-            assert isinstance(row[0], str), "sessionid should be a string"
+            assert isinstance(row[0], str), "sessionId should be a string"
         
         conn.close()
 
@@ -160,7 +156,7 @@ class TestDataIntegrityTypes:
         conn = psycopg2.connect(TEST_POSTGRES_URL, connect_timeout=5)
         cursor = conn.cursor()
         
-        cursor.execute("SELECT duration FROM ocpp_history_test WHERE duration IS NOT NULL LIMIT 1")
+        cursor.execute('SELECT "duration" FROM "ocpp"."history" WHERE "duration" IS NOT NULL LIMIT 1')
         row = cursor.fetchone()
         
         if row is not None:
@@ -169,14 +165,14 @@ class TestDataIntegrityTypes:
         conn.close()
 
     def test_energy_is_float(self):
-        """totalenergyconsumed should be a float."""
+        """totalEnergyConsumed should be a float."""
         conn = psycopg2.connect(TEST_POSTGRES_URL, connect_timeout=5)
         cursor = conn.cursor()
         
-        cursor.execute("SELECT totalenergyconsumed FROM ocpp_history_test WHERE totalenergyconsumed IS NOT NULL LIMIT 1")
+        cursor.execute('SELECT "totalEnergyConsumed" FROM "ocpp"."history" WHERE "totalEnergyConsumed" IS NOT NULL LIMIT 1')
         row = cursor.fetchone()
         
         if row is not None:
-            assert isinstance(row[0], (float, int)), "totalenergyconsumed should be a number"
+            assert isinstance(row[0], (float, int)), "totalEnergyConsumed should be a number"
         
         conn.close()

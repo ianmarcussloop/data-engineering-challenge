@@ -3,33 +3,34 @@
 import pytest
 from confluent_kafka.admin import AdminClient
 import psycopg2
+import os
 
 
-# Use existing infrastructure
-TEST_KAFKA_BROKER = "localhost:9092"
-TEST_POSTGRES_URL = "postgresql://ev_user:ev_password@localhost:5432/ev_coorp"
+# Use existing infrastructure, but respect test environment
+TEST_KAFKA_BROKER = os.environ.get("TEST_KAFKA_BROKER", "localhost:9092")
+TEST_POSTGRES_URL = os.environ.get("TEST_POSTGRES_URL", "postgresql://ev_user:ev_password@localhost:5432/ev_coorp")
 
 
 class TestDockerSetup:
     """Test that test infrastructure (topics and tables) exists in the existing Docker environment."""
     
     def test_kafka_running(self):
-        """Test that Kafka is running and has the ocpp.messages_test topic."""
+        """Test that Kafka is running and has the ocpp.messages topic."""
         admin = AdminClient({"bootstrap.servers": TEST_KAFKA_BROKER})
         topics = admin.list_topics(timeout=5).topics
-        assert "ocpp.messages_test" in topics, "ocpp.messages_test topic should exist in Kafka"
+        assert "ocpp.messages" in topics, "ocpp.messages topic should exist in Kafka"
     
     def test_ocpp_active_test_topic_exists(self):
-        """Test that ocpp.active_test topic exists."""
+        """Test that ocpp.active topic exists."""
         admin = AdminClient({"bootstrap.servers": TEST_KAFKA_BROKER})
         topics = admin.list_topics(timeout=5).topics
-        assert "ocpp.active_test" in topics, "ocpp.active_test topic should exist"
+        assert "ocpp.active" in topics, "ocpp.active topic should exist"
     
     def test_ocpp_active_raw_test_topic_exists(self):
-        """Test that ocpp.active.raw_test topic exists."""
+        """Test that ocpp.active.raw topic exists."""
         admin = AdminClient({"bootstrap.servers": TEST_KAFKA_BROKER})
         topics = admin.list_topics(timeout=5).topics
-        assert "ocpp.active.raw_test" in topics, "ocpp.active.raw_test topic should exist"
+        assert "ocpp.active.raw" in topics, "ocpp.active.raw topic should exist"
     
     def test_postgres_running(self):
         """Test that PostgreSQL is running."""
@@ -37,55 +38,55 @@ class TestDockerSetup:
         assert conn is not None
         conn.close()
     
-    def test_ocpp_history_test_table_exists(self):
-        """Test that ocpp_history_test table exists with all required fields."""
+    def test_ocpp_history_table_exists(self):
+        """Test that ocpp.history table exists with all required fields."""
         conn = psycopg2.connect(TEST_POSTGRES_URL, connect_timeout=5)
         cursor = conn.cursor()
         
-        # Check table exists
+        # Check table exists in ocpp schema
         cursor.execute("""
             SELECT table_name FROM information_schema.tables 
-            WHERE table_schema = 'public' AND table_name = 'ocpp_history_test'
+            WHERE table_schema = 'ocpp' AND table_name = 'history'
         """)
         result = cursor.fetchone()
-        assert result is not None, "ocpp_history_test table should exist"
+        assert result is not None, "ocpp.history table should exist"
         
-        # Check required columns (PostgreSQL stores them as lowercase)
+        # Check required columns (camelCase as per schema requirement)
         cursor.execute("""
             SELECT column_name FROM information_schema.columns 
-            WHERE table_schema = 'public' AND table_name = 'ocpp_history_test'
+            WHERE table_schema = 'ocpp' AND table_name = 'history'
         """)
         columns = [row[0] for row in cursor.fetchall()]
         
-        # PostgreSQL converts to lowercase, so check lowercase versions
+        # Columns are camelCase as per schema requirement
         required_fields = [
-            "sessionid", "stationid", "transactionid", "starttime", "endtime",
-            "duration", "terminationreason", "totalenergyconsumed",
-            "meterstart", "meterstop", "idtag"
+            "sessionId", "stationId", "transactionId", "startTime", "endTime",
+            "duration", "terminationReason", "totalEnergyConsumed",
+            "meterStart", "meterStop", "idTag"
         ]
         for field in required_fields:
-            assert field in columns, f"ocpp_history_test table should have {field} column"
+            assert field in columns, f"ocpp.history table should have {field} column, has: {columns}"
         
         conn.close()
     
-    def test_ocpp_history_test_indexes(self):
-        """Test that ocpp_history_test table has required indexes."""
+    def test_ocpp_history_indexes(self):
+        """Test that ocpp.history table has required indexes."""
         conn = psycopg2.connect(TEST_POSTGRES_URL, connect_timeout=5)
         cursor = conn.cursor()
         
-        # Get all indexes on ocpp_history_test
+        # Get all indexes on ocpp.history (table name is 'history' in schema 'ocpp')
         cursor.execute("""
             SELECT indexname, indexdef 
             FROM pg_indexes 
-            WHERE tablename = 'ocpp_history_test' AND schemaname = 'public'
+            WHERE tablename = 'history' AND schemaname = 'ocpp'
         """)
         indexes = {row[0]: row[1] for row in cursor.fetchall()}
         
-        # Check required indexes exist (PostgreSQL column names are lowercase)
-        required_indexes = ["stationid", "transactionid", "starttime", "endtime", "terminationreason"]
+        # Check required indexes exist (camelCase column names)
+        required_indexes = ["stationId", "transactionId", "startTime", "endTime", "terminationReason"]
         for idx_col in required_indexes:
-            found = any(f'({idx_col})' in indexdef or f'({idx_col},' in indexdef or f', {idx_col})' in indexdef 
+            found = any(f'("{idx_col}")' in indexdef or f'("{idx_col}",' in indexdef or f', "{idx_col}")' in indexdef 
                        for indexdef in indexes.values())
-            assert found, f"ocpp_history_test should have index on {idx_col}"
+            assert found, f"ocpp.history should have index on {idx_col}, has: {list(indexes.keys())}"
         
         conn.close()

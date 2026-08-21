@@ -7,6 +7,9 @@ import os
 # Add postgres scripts to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../postgres/scripts'))
 
+# Read from environment or use defaults
+TEST_POSTGRES_URL = os.environ.get("TEST_POSTGRES_URL", "postgresql://ev_user:ev_password@localhost:5432/ev_coorp")
+
 
 # =============================================================================
 # Mock-based tests for schema verification
@@ -34,34 +37,34 @@ class TestSchemaModels:
         assert OcppHistory.__tablename__ == "ocpp.history"
 
     def test_models_have_required_fields(self):
-        """Test that models have required fields."""
+        """Test that models have required fields (snake_case Python attributes, camelCase DB columns)."""
         from postgres.schema.charger_session import ChargerSession
         from postgres.schema.ocpp_history import OcppHistory
         from sqlmodel import Field
         
-        # Check ChargerSession fields
+        # Check ChargerSession fields (still using camelCase for now)
         assert hasattr(ChargerSession, "sessionId")
         assert hasattr(ChargerSession, "stationId")
         assert hasattr(ChargerSession, "startTime")
         assert hasattr(ChargerSession, "status")
         
-        # Check OcppHistory fields
-        assert hasattr(OcppHistory, "sessionId")
-        assert hasattr(OcppHistory, "stationId")
-        assert hasattr(OcppHistory, "transactionId")
-        assert hasattr(OcppHistory, "startTime")
-        assert hasattr(OcppHistory, "endTime")
+        # Check OcppHistory fields (snake_case Python attributes map to camelCase DB columns)
+        assert hasattr(OcppHistory, "session_id")
+        assert hasattr(OcppHistory, "station_id")
+        assert hasattr(OcppHistory, "transaction_id")
+        assert hasattr(OcppHistory, "start_time")
+        assert hasattr(OcppHistory, "end_time")
         assert hasattr(OcppHistory, "duration")
         
         # Check optional fields in OcppHistory
-        assert hasattr(OcppHistory, "totalEnergyConsumed")
-        assert hasattr(OcppHistory, "avgPower")
-        assert hasattr(OcppHistory, "maxPower")
-        assert hasattr(OcppHistory, "meterStart")
-        assert hasattr(OcppHistory, "meterStop")
-        assert hasattr(OcppHistory, "socStart")
-        assert hasattr(OcppHistory, "socEnd")
-        assert hasattr(OcppHistory, "voltageAvg")
+        assert hasattr(OcppHistory, "total_energy_consumed")
+        assert hasattr(OcppHistory, "avg_power")
+        assert hasattr(OcppHistory, "max_power")
+        assert hasattr(OcppHistory, "meter_start")
+        assert hasattr(OcppHistory, "meter_stop")
+        assert hasattr(OcppHistory, "soc_start")
+        assert hasattr(OcppHistory, "soc_end")
+        assert hasattr(OcppHistory, "voltage_avg")
 
 
 class TestConfiguration:
@@ -130,18 +133,24 @@ class TestDatabaseIntegration:
 
     @pytest.mark.postgres
     @pytest.mark.integration
-    @pytest.mark.skip(reason="Requires real PostgreSQL database")
     def test_create_tables_with_real_db(self):
         """Test create_tables with a real database connection."""
         pytest.importorskip("psycopg2")
         pytest.importorskip("sqlmodel")
         
         # This test requires the actual database to be running
-        # For now, just verify we can import and call the function
-        # without errors when the database is available
+        # Try to connect to the database
         try:
-            from init_db import create_tables
-            # Don't actually call it as it requires a real DB
+            import psycopg2
+            conn = psycopg2.connect(TEST_POSTGRES_URL, connect_timeout=5)
+            conn.close()
+        except Exception:
+            pytest.skip("PostgreSQL database is not available")
+        
+        # Verify we can import and call the function
+        try:
+            from postgres.scripts.init_db import create_tables
+            # Don't actually call it as it might modify the DB
             assert callable(create_tables)
         except ImportError:
             pytest.skip("Required dependencies not available")

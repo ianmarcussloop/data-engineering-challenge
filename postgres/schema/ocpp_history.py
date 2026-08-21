@@ -5,29 +5,35 @@ from sqlmodel import Field, SQLModel
 
 class OcppHistory(SQLModel, table=True):
     __tablename__ = "ocpp.history"
+    __table_args__ = {"extend_existing": True}
 
     # Key fields
-    sessionId: str = Field(
+    session_id: str = Field(
+        sa_column_kwargs={"name": "sessionId"},
         primary_key=True,
         description="Charger name + startTime (e.g., 'charger6_2025-08-26T23:59:57.599Z')"
     )
 
-    stationId: str = Field(
+    station_id: str = Field(
+        sa_column_kwargs={"name": "stationId"},
         description="Charger name (e.g., 'charger6')",
         index=True
     )
 
-    transactionId: str = Field(
+    transaction_id: str = Field(
+        sa_column_kwargs={"name": "transactionId"},
         description="OCPP transaction ID",
         index=True
     )
 
-    startTime: datetime = Field(
+    start_time: datetime = Field(
+        sa_column_kwargs={"name": "startTime"},
         description="Timestamp of the first MeterValues or StartTransaction",
         index=True
     )
 
-    endTime: datetime = Field(
+    end_time: datetime = Field(
+        sa_column_kwargs={"name": "endTime"},
         description="Timestamp of StopTransaction or RemoteStopTransaction",
         index=True
     )
@@ -36,64 +42,76 @@ class OcppHistory(SQLModel, table=True):
         description="Duration of the session in seconds (endTime - startTime)"
     )
 
-    terminationReason: Optional[str] = Field(
+    termination_reason: Optional[str] = Field(
+        sa_column_kwargs={"name": "terminationReason"},
         default=None,
         description="Reason for session termination (from StopTransaction)",
         index=True
     )
 
-    totalEnergyConsumed: Optional[float] = Field(
+    total_energy_consumed: Optional[float] = Field(
+        sa_column_kwargs={"name": "totalEnergyConsumed"},
         default=None,
         description="Total energy consumed in kWh"
     )
 
-    avgPower: Optional[float] = Field(
+    avg_power: Optional[float] = Field(
+        sa_column_kwargs={"name": "avgPower"},
         default=None,
         description="Average power during the session"
     )
 
-    maxPower: Optional[float] = Field(
+    max_power: Optional[float] = Field(
+        sa_column_kwargs={"name": "maxPower"},
         default=None,
         description="Maximum power during the session"
     )
 
-    idTag: Optional[str] = Field(
+    id_tag: Optional[str] = Field(
+        sa_column_kwargs={"name": "idTag"},
         default=None,
         description="ID tag from StartTransaction"
     )
 
-    connectorId: Optional[int] = Field(
+    connector_id: Optional[int] = Field(
+        sa_column_kwargs={"name": "connectorId"},
         default=None,
         description="Connector ID from StartTransaction"
     )
 
-    meterStart: Optional[int] = Field(
+    meter_start: Optional[int] = Field(
+        sa_column_kwargs={"name": "meterStart"},
         default=None,
         description="Meter start value from StartTransaction"
     )
 
-    meterStop: Optional[int] = Field(
+    meter_stop: Optional[int] = Field(
+        sa_column_kwargs={"name": "meterStop"},
         default=None,
         description="Meter stop value from StopTransaction"
     )
 
-    socStart: Optional[float] = Field(
+    soc_start: Optional[float] = Field(
+        sa_column_kwargs={"name": "socStart"},
         default=None,
         description="State of Charge at start (percentage)"
     )
 
-    socEnd: Optional[float] = Field(
+    soc_end: Optional[float] = Field(
+        sa_column_kwargs={"name": "socEnd"},
         default=None,
         description="State of Charge at end (percentage)"
     )
 
-    voltageAvg: Optional[float] = Field(
+    voltage_avg: Optional[float] = Field(
+        sa_column_kwargs={"name": "voltageAvg"},
         default=None,
         description="Average voltage during the session"
     )
 
     # Additional metadata
-    eventCount: int = Field(
+    event_count: int = Field(
+        sa_column_kwargs={"name": "eventCount"},
         default=0,
         description="Total number of OCPP messages for this session"
     )

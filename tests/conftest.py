@@ -10,13 +10,13 @@ import psycopg2
 from sqlalchemy import text, create_engine
 
 
-# Test infrastructure configuration
-TEST_KAFKA_BROKER = "localhost:9092"
-TEST_POSTGRES_URL = "postgresql://ev_user:ev_password@localhost:5432/ev_coorp"
+# Test infrastructure configuration - read from environment or use defaults
+TEST_KAFKA_BROKER = os.environ.get("TEST_KAFKA_BROKER", "localhost:9092")
+TEST_POSTGRES_URL = os.environ.get("TEST_POSTGRES_URL", "postgresql://ev_user:ev_password@localhost:5432/ev_coorp")
 
-# Test-specific resource names (to avoid conflicts with production)
-TEST_TOPICS = ["ocpp.messages_test", "ocpp.active_test", "ocpp.active.raw_test"]
-TEST_TABLE = "ocpp.history_test"
+# Resource names - same as production since test environment is isolated
+TEST_TOPICS = ["ocpp.messages", "ocpp.active", "ocpp.active.raw"]
+TEST_TABLE = "ocpp.history"
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -27,13 +27,13 @@ def setup_test_infrastructure():
     admin = AdminClient({"bootstrap.servers": TEST_KAFKA_BROKER})
     
     test_topic_configs = {
-        "ocpp.messages_test": {},
-        "ocpp.active_test": {
+        "ocpp.messages": {},
+        "ocpp.active": {
             "cleanup.policy": "compact",
             "segment.ms": "60000",
             "min.compaction.lag.ms": "1000"
         },
-        "ocpp.active.raw_test": {
+        "ocpp.active.raw": {
             "cleanup.policy": "compact",
             "retention.ms": "259200000",
             "segment.ms": "60000",
@@ -41,7 +41,7 @@ def setup_test_infrastructure():
         }
     }
     
-    for topic_name in ["ocpp.messages_test", "ocpp.active_test", "ocpp.active.raw_test"]:
+    for topic_name in ["ocpp.messages", "ocpp.active", "ocpp.active.raw"]:
         if topic_name not in admin.list_topics(timeout=5).topics:
             new_topic = NewTopic(
                 topic_name,
@@ -58,46 +58,51 @@ def setup_test_infrastructure():
     engine = create_engine(TEST_POSTGRES_URL)
     
     with engine.connect() as conn:
-        # Check if test table already exists
+        # Create the ocpp schema if it doesn't exist
+        conn.execute(text("CREATE SCHEMA IF NOT EXISTS ocpp"))
+        conn.commit()
+        
+        # Check if table already exists in ocpp schema
         result = conn.execute(text("""
             SELECT table_name FROM information_schema.tables 
-            WHERE table_schema = 'public' AND table_name = 'ocpp_history_test'
+            WHERE table_schema = 'ocpp' AND table_name = 'history'
         """)).fetchone()
         
         if result is None:
-            # Create the test table with the same schema as ocpp.history
+            # Create the table in the ocpp schema to match production
+            # Use quoted identifiers to preserve camelCase column names
             conn.execute(text("""
-                CREATE TABLE public.ocpp_history_test (
-                    sessionId TEXT PRIMARY KEY,
-                    stationId TEXT NOT NULL,
-                    transactionId TEXT NOT NULL,
-                    startTime TIMESTAMP NOT NULL,
-                    endTime TIMESTAMP NOT NULL,
-                    duration INTEGER NOT NULL,
-                    terminationReason TEXT,
-                    totalEnergyConsumed FLOAT,
-                    avgPower FLOAT,
-                    maxPower FLOAT,
-                    idTag TEXT,
-                    connectorId INTEGER,
-                    meterStart INTEGER,
-                    meterStop INTEGER,
-                    socStart FLOAT,
-                    socEnd FLOAT,
-                    voltageAvg FLOAT,
-                    eventCount INTEGER DEFAULT 0
+                CREATE TABLE "ocpp"."history" (
+                    "sessionId" TEXT PRIMARY KEY,
+                    "stationId" TEXT NOT NULL,
+                    "transactionId" TEXT NOT NULL,
+                    "startTime" TIMESTAMP NOT NULL,
+                    "endTime" TIMESTAMP NOT NULL,
+                    "duration" INTEGER NOT NULL,
+                    "terminationReason" TEXT,
+                    "totalEnergyConsumed" FLOAT,
+                    "avgPower" FLOAT,
+                    "maxPower" FLOAT,
+                    "idTag" TEXT,
+                    "connectorId" INTEGER,
+                    "meterStart" INTEGER,
+                    "meterStop" INTEGER,
+                    "socStart" FLOAT,
+                    "socEnd" FLOAT,
+                    "voltageAvg" FLOAT,
+                    "eventCount" INTEGER DEFAULT 0
                 )
             """))
             
-            # Create indexes
-            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_ocpp_history_test_stationid ON public.ocpp_history_test (stationId)"))
-            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_ocpp_history_test_transactionid ON public.ocpp_history_test (transactionId)"))
-            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_ocpp_history_test_starttime ON public.ocpp_history_test (startTime)"))
-            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_ocpp_history_test_endtime ON public.ocpp_history_test (endTime)"))
-            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_ocpp_history_test_terminationreason ON public.ocpp_history_test (terminationReason)"))
+            # Create indexes on camelCase columns
+            conn.execute(text('CREATE INDEX IF NOT EXISTS idx_ocpp_history_stationId ON "ocpp"."history" ("stationId")'))
+            conn.execute(text('CREATE INDEX IF NOT EXISTS idx_ocpp_history_transactionId ON "ocpp"."history" ("transactionId")'))
+            conn.execute(text('CREATE INDEX IF NOT EXISTS idx_ocpp_history_startTime ON "ocpp"."history" ("startTime")'))
+            conn.execute(text('CREATE INDEX IF NOT EXISTS idx_ocpp_history_endTime ON "ocpp"."history" ("endTime")'))
+            conn.execute(text('CREATE INDEX IF NOT EXISTS idx_ocpp_history_terminationReason ON "ocpp"."history" ("terminationReason")'))
             
             conn.commit()
-            print("Created test PostgreSQL table: ocpp.history_test")
+            print("Created PostgreSQL table: ocpp.history")
     
     yield
     
@@ -110,22 +115,22 @@ class TestInfrastructure:
     
     @staticmethod
     def ensure_kafka_topics():
-        """Ensure test Kafka topics exist."""
+        """Ensure Kafka topics exist."""
         admin = AdminClient({"bootstrap.servers": TEST_KAFKA_BROKER})
-        for topic in ["ocpp.active_test", "ocpp.active.raw_test"]:
+        for topic in ["ocpp.active", "ocpp.active.raw"]:
             if topic not in admin.list_topics(timeout=5).topics:
-                raise RuntimeError(f"Test topic {topic} does not exist")
+                raise RuntimeError(f"Topic {topic} does not exist")
     
     @staticmethod
     def ensure_postgres_table():
-        """Ensure test PostgreSQL table exists."""
+        """Ensure PostgreSQL table exists."""
         conn = psycopg2.connect(TEST_POSTGRES_URL, connect_timeout=5)
         cursor = conn.cursor()
         cursor.execute("""
             SELECT table_name FROM information_schema.tables 
-            WHERE table_schema = 'public' AND table_name = 'ocpp.history_test'
+            WHERE table_schema = 'ocpp' AND table_name = 'history'
         """)
         if cursor.fetchone() is None:
             conn.close()
-            raise RuntimeError("Test table ocpp.history_test does not exist")
+            raise RuntimeError("Table ocpp.history does not exist")
         conn.close()
