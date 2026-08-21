@@ -24,7 +24,7 @@ class TestOCPPMessageProduction:
     """Test producing OCPP messages to Kafka topics."""
 
     def test_produce_start_transaction_to_messages(self):
-        """Should be able to produce StartTransaction to ocpp.messages_test."""
+        """Should be able to produce StartTransaction to ocpp.messages."""
         producer = Producer({"bootstrap.servers": TEST_KAFKA_BROKER})
         
         msg = start_transaction(
@@ -33,18 +33,19 @@ class TestOCPPMessageProduction:
             meterStart=1000,
             idTag="RFID123",
             timestamp="2025-08-18T10:00:00.000Z",
-            connectorId=1
+            connectorId=1,
+            wrap_for_kafka=True
         )
         
         # Produce should not raise an exception
-        producer.produce("ocpp.messages_test", value=msg)
+        producer.produce("ocpp.messages", value=msg)
         producer.flush(timeout=5)
         
         # If we get here without exception, the produce was successful
         assert True
 
     def test_produce_meter_values_to_messages(self):
-        """Should be able to produce MeterValues to ocpp.messages_test."""
+        """Should be able to produce MeterValues to ocpp.messages."""
         producer = Producer({"bootstrap.servers": TEST_KAFKA_BROKER})
         
         msg = meter_values(
@@ -54,18 +55,19 @@ class TestOCPPMessageProduction:
             energy=1050.0,
             soc=50.0,
             voltage=230.0,
-            timestamp="2025-08-18T10:01:00.000Z"
+            timestamp="2025-08-18T10:01:00.000Z",
+            wrap_for_kafka=True
         )
         
         # Produce should not raise an exception
-        producer.produce("ocpp.messages_test", value=msg)
+        producer.produce("ocpp.messages", value=msg)
         producer.flush(timeout=5)
         
         # If we get here without exception, the produce was successful
         assert True
 
     def test_produce_stop_transaction_to_messages(self):
-        """Should be able to produce StopTransaction to ocpp.messages_test."""
+        """Should be able to produce StopTransaction to ocpp.messages."""
         producer = Producer({"bootstrap.servers": TEST_KAFKA_BROKER})
         
         msg = stop_transaction(
@@ -73,28 +75,30 @@ class TestOCPPMessageProduction:
             transactionId="txn001",
             meterStop=1100,
             reason="EVDriverDisconnected",
-            timestamp="2025-08-18T10:05:00.000Z"
+            timestamp="2025-08-18T10:05:00.000Z",
+            wrap_for_kafka=True
         )
         
         # Produce should not raise an exception
-        producer.produce("ocpp.messages_test", value=msg)
+        producer.produce("ocpp.messages", value=msg)
         producer.flush(timeout=5)
         
         # If we get here without exception, the produce was successful
         assert True
 
     def test_produce_remote_stop_transaction_to_messages(self):
-        """Should be able to produce RemoteStopTransaction to ocpp.messages_test."""
+        """Should be able to produce RemoteStopTransaction to ocpp.messages."""
         producer = Producer({"bootstrap.servers": TEST_KAFKA_BROKER})
         
         msg = remote_stop_transaction(
             chargerId="charger1",
             transactionId="txn001",
-            timestamp="2025-08-18T10:05:00.000Z"
+            timestamp="2025-08-18T10:05:00.000Z",
+            wrap_for_kafka=True
         )
         
         # Produce should not raise an exception
-        producer.produce("ocpp.messages_test", value=msg)
+        producer.produce("ocpp.messages", value=msg)
         producer.flush(timeout=5)
         
         # If we get here without exception, the produce was successful
@@ -105,7 +109,7 @@ class TestOCPPMessageConsumption:
     """Test consuming OCPP messages from Kafka topics."""
 
     def test_consume_from_ocpp_messages(self):
-        """Should be able to consume messages from ocpp.messages_test."""
+        """Should be able to consume messages from ocpp.messages."""
         # First produce a test message with unique group ID
         producer = Producer({"bootstrap.servers": TEST_KAFKA_BROKER})
         import uuid
@@ -113,9 +117,10 @@ class TestOCPPMessageConsumption:
         msg = start_transaction(
             chargerId=f"test_charger_consume_{unique_id}",
             transactionId=f"txn_consume_{unique_id}",
-            meterStart=1000
+            meterStart=1000,
+            wrap_for_kafka=True
         )
-        producer.produce("ocpp.messages_test", value=msg)
+        producer.produce("ocpp.messages", value=msg)
         producer.flush(timeout=5)
         
         # Now consume it with unique consumer group
@@ -125,7 +130,7 @@ class TestOCPPMessageConsumption:
             "auto.offset.reset": "latest",
             "enable.auto.commit": False
         })
-        consumer.subscribe(["ocpp.messages_test"])
+        consumer.subscribe(["ocpp.messages"])
         
         consumed_msg = consumer.poll(timeout=5)
         consumer.close()
@@ -137,8 +142,8 @@ class TestOCPPMessageConsumption:
             assert "StartTransaction" in consumed_msg.value().decode('utf-8')
         # If we don't get it, it's okay (race condition)
 
-    def test_consume_with_key_from_active_test(self):
-        """Should be able to produce and consume messages with keys from ocpp.active_test."""
+    def test_consume_with_key_from_active(self):
+        """Should be able to produce and consume messages with keys from ocpp.active."""
         producer = Producer({"bootstrap.servers": TEST_KAFKA_BROKER})
         
         import uuid
@@ -155,7 +160,7 @@ class TestOCPPMessageConsumption:
             "runningCount": 10
         }
         
-        producer.produce("ocpp.active_test", key=session_id, value=json.dumps(msg))
+        producer.produce("ocpp.active", key=session_id, value=json.dumps(msg))
         producer.flush(timeout=5)
         
         # Consume with key and unique group
@@ -165,7 +170,7 @@ class TestOCPPMessageConsumption:
             "auto.offset.reset": "latest",
             "enable.auto.commit": False
         })
-        consumer.subscribe(["ocpp.active_test"])
+        consumer.subscribe(["ocpp.active"])
         
         consumed_msg = consumer.poll(timeout=5)
         consumer.close()
@@ -270,7 +275,7 @@ class TestKafkaMessageHeaders:
         
         # Produce should not raise an exception
         producer.produce(
-            "ocpp.active_test",
+            "ocpp.active",
             key=session_id,
             value=json.dumps(msg),
             headers=headers
@@ -309,7 +314,7 @@ class TestKafkaErrorHandling:
         })
         
         # Use a topic that exists but has no messages for this consumer group
-        consumer.subscribe(["ocpp.messages_test"])
+        consumer.subscribe(["ocpp.messages"])
         
         # Poll with short timeout
         msg = consumer.poll(timeout=1)
@@ -323,10 +328,10 @@ class TestKafkaTopicConfiguration:
     """Test verification of Kafka topic configurations."""
 
     def test_ocpp_messages_topic_exists(self):
-        """ocpp.messages_test topic should exist."""
+        """ocpp.messages topic should exist."""
         admin = AdminClient({"bootstrap.servers": TEST_KAFKA_BROKER})
         topics = admin.list_topics(timeout=5).topics
-        assert "ocpp.messages_test" in topics
+        assert "ocpp.messages" in topics
 
     def test_ocpp_active_topic_exists(self):
         """ocpp.active topic should exist."""
@@ -345,7 +350,7 @@ class TestSessionMessageFlow:
     """Test the complete message flow for a charging session."""
 
     def test_complete_session_production(self):
-        """Should be able to produce a complete session lifecycle to ocpp.messages_test."""
+        """Should be able to produce a complete session lifecycle to ocpp.messages."""
         producer = Producer({"bootstrap.servers": TEST_KAFKA_BROKER})
         
         base_timestamp = "2025-08-18T10:00:00.000Z"
@@ -357,7 +362,8 @@ class TestSessionMessageFlow:
             meterStart=1000,
             idTag="RFID123",
             timestamp=base_timestamp,
-            connectorId=1
+            connectorId=1,
+            wrap_for_kafka=True
         )
         
         # 2. Multiple MeterValues
@@ -368,7 +374,8 @@ class TestSessionMessageFlow:
             energy=1050.0,
             soc=50.0,
             voltage=230.0,
-            timestamp="2025-08-18T10:01:00.000Z"
+            timestamp="2025-08-18T10:01:00.000Z",
+            wrap_for_kafka=True
         )
         
         msg3 = meter_values(
@@ -378,7 +385,8 @@ class TestSessionMessageFlow:
             energy=1060.0,
             soc=52.0,
             voltage=230.0,
-            timestamp="2025-08-18T10:02:00.000Z"
+            timestamp="2025-08-18T10:02:00.000Z",
+            wrap_for_kafka=True
         )
         
         # 3. StopTransaction
@@ -387,12 +395,13 @@ class TestSessionMessageFlow:
             transactionId="txn_session_001",
             meterStop=1100,
             reason="EVDriverDisconnected",
-            timestamp="2025-08-18T10:05:00.000Z"
+            timestamp="2025-08-18T10:05:00.000Z",
+            wrap_for_kafka=True
         )
         
         # Produce all messages
         for msg in [msg1, msg2, msg3, msg4]:
-            producer.produce("ocpp.messages_test", value=msg)
+            producer.produce("ocpp.messages", value=msg)
         
         producer.flush(timeout=5)
         
@@ -403,7 +412,7 @@ class TestSessionMessageFlow:
             "auto.offset.reset": "earliest",
             "enable.auto.commit": False
         })
-        consumer.subscribe(["ocpp.messages_test"])
+        consumer.subscribe(["ocpp.messages"])
         
         consumed_count = 0
         for _ in range(10):

@@ -386,11 +386,12 @@ class TestOCPPMessageInKafka:
             meterStart=1000,
             idTag="RFID123",
             timestamp="2025-08-18T10:00:00.000Z",
-            connectorId=1
+            connectorId=1,
+            wrap_for_kafka=True
         )
         
         # Produce to Kafka
-        producer.produce("ocpp.messages_test", value=original_msg)
+        producer.produce("ocpp.messages", value=original_msg)
         producer.flush(timeout=5)
         
         # Consume from Kafka
@@ -400,7 +401,7 @@ class TestOCPPMessageInKafka:
             "auto.offset.reset": "latest",
             "enable.auto.commit": False
         })
-        consumer.subscribe(["ocpp.messages_test"])
+        consumer.subscribe(["ocpp.messages"])
         
         consumed_msg = consumer.poll(timeout=5)
         consumer.close()
@@ -408,11 +409,11 @@ class TestOCPPMessageInKafka:
         if consumed_msg is not None:
             consumed_value = consumed_msg.value().decode('utf-8')
             
-            # Parse both and compare
-            original_parsed = ast.literal_eval(original_msg)
-            consumed_parsed = ast.literal_eval(consumed_value)
+            # Parse both as JSON and compare
+            import json
+            original_parsed = json.loads(original_msg)
+            consumed_parsed = json.loads(consumed_value)
             
-            assert consumed_parsed[0] == original_parsed[0]  # messageType
-            assert consumed_parsed[2] == original_parsed[2]  # action
-            assert consumed_parsed[3]["transactionId"] == original_parsed[3]["transactionId"]
-            assert consumed_parsed[3]["meterStart"] == original_parsed[3]["meterStart"]
+            assert consumed_parsed["chargerId"] == original_parsed["chargerId"]
+            assert consumed_parsed["uniqueId"] == original_parsed["uniqueId"]
+            assert consumed_parsed["message"] == original_parsed["message"]
