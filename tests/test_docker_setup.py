@@ -43,29 +43,29 @@ class TestDockerSetup:
         conn = psycopg2.connect(TEST_POSTGRES_URL, connect_timeout=5)
         cursor = conn.cursor()
         
-        # Check table exists in ocpp schema
+        # Check table exists
         cursor.execute("""
-            SELECT table_name FROM information_schema.tables 
-            WHERE table_schema = 'ocpp' AND table_name = 'history'
+            SELECT "table_name" FROM information_schema.tables 
+            WHERE "table_schema" = 'public' AND "table_name" = 'ocpp.history'
         """)
         result = cursor.fetchone()
         assert result is not None, "ocpp.history table should exist"
         
-        # Check required columns (camelCase as per schema requirement)
+        # Check required columns (PostgreSQL stores them as lowercase)
         cursor.execute("""
-            SELECT column_name FROM information_schema.columns 
-            WHERE table_schema = 'ocpp' AND table_name = 'history'
+            SELECT "column_name" FROM information_schema.columns 
+            WHERE "table_schema" = 'public' AND "table_name" = 'ocpp.history'
         """)
         columns = [row[0] for row in cursor.fetchall()]
         
-        # Columns are camelCase as per schema requirement
+        # PostgreSQL converts to lowercase, so check lowercase versions
         required_fields = [
             "sessionId", "stationId", "transactionId", "startTime", "endTime",
             "duration", "terminationReason", "totalEnergyConsumed",
             "meterStart", "meterStop", "idTag"
         ]
         for field in required_fields:
-            assert field in columns, f"ocpp.history table should have {field} column, has: {columns}"
+            assert field in columns, f"ocpp.history table should have {field} column"
         
         conn.close()
     
@@ -74,15 +74,15 @@ class TestDockerSetup:
         conn = psycopg2.connect(TEST_POSTGRES_URL, connect_timeout=5)
         cursor = conn.cursor()
         
-        # Get all indexes on ocpp.history (table name is 'history' in schema 'ocpp')
+        # Get all indexes on ocpp.history in the ocpp schema
         cursor.execute("""
-            SELECT indexname, indexdef 
+            SELECT "indexname", "indexdef" 
             FROM pg_indexes 
-            WHERE tablename = 'history' AND schemaname = 'ocpp'
+            WHERE "tablename" = 'history' AND "schemaname" = 'ocpp'
         """)
         indexes = {row[0]: row[1] for row in cursor.fetchall()}
         
-        # Check required indexes exist (camelCase column names)
+        # Check required indexes exist (camelCase column names as per schema)
         required_indexes = ["stationId", "transactionId", "startTime", "endTime", "terminationReason"]
         for idx_col in required_indexes:
             found = any(f'("{idx_col}")' in indexdef or f'("{idx_col}",' in indexdef or f', "{idx_col}")' in indexdef 
