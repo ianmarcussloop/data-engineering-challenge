@@ -183,7 +183,8 @@ def publish_to_kafka(validated_pairs, unpaired_requests, unpaired_responses, unp
     print(f"📊 Publishing {len(validated_pairs)} validated message pairs...")
     for i, pair in enumerate(validated_pairs):
         try:
-            # Publish just the request to ocpp.messages
+            # Publish just the request to ocpp.messages with uniqueId as key
+            # Value contains chargerId and raw message
             message_data = {
                 "chargerId": pair["chargerId"],
                 "uniqueId": pair["uniqueId"],
@@ -191,6 +192,7 @@ def publish_to_kafka(validated_pairs, unpaired_requests, unpaired_responses, unp
             }
             producer.produce(
                 topic=VALID_TOPIC,
+                key=pair["uniqueId"].encode('utf-8'),
                 value=json.dumps(message_data).encode('utf-8'),
                 callback=delivery_report
             )
@@ -204,6 +206,7 @@ def publish_to_kafka(validated_pairs, unpaired_requests, unpaired_responses, unp
                 producer.poll(1.0)
                 producer.produce(
                     topic=VALID_TOPIC,
+                    key=pair["uniqueId"].encode('utf-8'),
                     value=json.dumps(message_data).encode('utf-8'),
                     callback=delivery_report
                 )

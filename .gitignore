@@ -58,6 +58,8 @@ htmlcov/
 
 # Spark
 spark-checkpoints/
+spark-checkpoints-test/
+*.crc
 
 # Obsidian
 .obsidian/

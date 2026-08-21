@@ -69,9 +69,9 @@ class CleanupScript:
     ]
     
     # Test environment configuration
-    TEST_POSTGRES_URL = "postgresql://ev_user:ev_password@localhost:5432/ev_coorp"
+    TEST_POSTGRES_URL = "postgresql://ev_user:ev_password@localhost:5433/ev_coorp_test"
     TEST_TABLES = [
-        ("public", "ocpp_history_test"),  # test table
+        ("public", "ocpp_history"),  # test table
     ]
     
     # =========================================================================
@@ -90,10 +90,10 @@ class CleanupScript:
     
     # Test topics
     TEST_TOPICS = [
-        "ocpp.messages_test",
-        "ocpp.malformed_test",
-        "ocpp.active_test",
-        "ocpp.active.raw_test",
+        "ocpp.messages",
+        "ocpp.malformed",
+        "ocpp.active",
+        "ocpp.active.raw",
     ]
     
     def check_postgres_connection(self, db_url: str) -> bool:

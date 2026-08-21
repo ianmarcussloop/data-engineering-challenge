@@ -9,6 +9,11 @@ TOPIC_NAME = "ocpp.messages"
 SCHEMA_REGISTRY_URL = os.getenv("SCHEMA_REGISTRY_URL", "http://localhost:8081")
 SCHEMA_SUBJECT = f"{TOPIC_NAME}-value"  # Subject for the schema
 
+# Debug: Print configuration to verify environment variables are being read
+import sys
+print(f"[DEBUG create_topics.py] KAFKA_BROKER={KAFKA_BROKER}, SCHEMA_REGISTRY_URL={SCHEMA_REGISTRY_URL}")
+sys.stdout.flush()
+
 # --- Schema Definition ---
 SCHEMA_DEFINITION = {
     "type": "record",
@@ -31,12 +36,8 @@ def create_kafka_topic():
     topics = [
         # Main raw OCPP messages topic - only validated request/response pairs
         ("ocpp.messages", 1, 1, {}),
-        # Test raw OCPP messages topic
-        ("ocpp.messages_test", 1, 1, {}),
         # Malformed messages topic - for messages without complete pairs
         ("ocpp.malformed", 1, 1, {}),
-        # Test malformed messages topic
-        ("ocpp.malformed_test", 1, 1, {}),
         
         # NEW: Normalized topic - all processed messages for ACTIVE sessions only
         ("ocpp.active.raw", 10, 1, {
@@ -87,7 +88,7 @@ def register_schema():
     )
 
     # List of subjects to register
-    subjects = ["ocpp.messages-value", "ocpp.messages_test-value"]
+    subjects = ["ocpp.messages-value"]
     
     for subject in subjects:
         try:

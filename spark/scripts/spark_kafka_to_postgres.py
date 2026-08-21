@@ -23,6 +23,7 @@ KAFKA_BROKER = os.getenv("KAFKA_BROKER", "localhost:9092")
 POSTGRES_URL = os.getenv("POSTGRES_URL", "jdbc:postgresql://localhost:5432/ev_coorp")
 POSTGRES_USER = os.getenv("POSTGRES_USER", "ev_user")
 POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "ev_password")
+CHECKPOINT_DIR = os.getenv("CHECKPOINT_DIR", "./spark-checkpoints")
 
 message_schema = "chargerId STRING, uniqueId STRING, message STRING"
 
@@ -54,18 +55,24 @@ def parse_timestamp(message: str) -> Optional[str]:
             return None
         action = msg[2]
         payload = msg[3] if len(msg) > 3 and isinstance(msg[3], dict) else {}
-        if action == "MeterValues":
+        
+        # First, try to get timestamp from top-level payload (works for StartTransaction, StopTransaction, etc.)
+        ts = payload.get("timestamp") if isinstance(payload, dict) else None
+        if ts:
+            return ts.replace("Z", "+00:00")
+        
+        # For MeterValues, timestamp is nested in meterValue[0].timestamp
+        if action == "MeterValues" and isinstance(payload, dict):
             mv_list = payload.get("meterValue", [])
-            if mv_list:
+            if mv_list and len(mv_list) > 0 and isinstance(mv_list[0], dict):
                 ts = mv_list[0].get("timestamp")
                 if ts:
                     return ts.replace("Z", "+00:00")
-        else:
-            ts = payload.get("timestamp")
-            if ts:
-                return ts.replace("Z", "+00:00")
+        
         return None
-    except:
+    except Exception as e:
+        # Debug logging for diagnosis
+        print(f"[WARN] parse_timestamp failed for message: {message[:100]}... Error: {e}")
         return None
 
 def parse_action(message: str) -> Optional[str]:
@@ -175,18 +182,27 @@ def is_stop_action(action: str) -> bool:
 # ============================================================================
 
 def run_pipeline():
+    print("[DEBUG] Starting run_pipeline()")
+    print("[DEBUG] Setting SPARK_LOCAL_IP=127.0.0.1 via os.environ")
+    import os
+    os.environ["SPARK_LOCAL_IP"] = "127.0.0.1"
     spark = SparkSession.builder \
         .appName("OCPPtoKafkaAndPostgres") \
+        .master("local[1]") \
+        .config("spark.driver.host", "127.0.0.1") \
+        .config("spark.driver.bindAddress", "127.0.0.1") \
+        .config("spark.ui.port", "4042") \
         .config("spark.sql.shuffle.partitions", "4") \
         .config("spark.sql.streaming.stateStore.stateSchemaCheck", "false") \
         .config("spark.sql.legacy.timeParserPolicy", "LEGACY") \
         .config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.9,org.postgresql:postgresql:42.7.3") \
+        .config("spark.driver.extraJavaOptions", "-Dspark.local.ip=127.0.0.1 -Djava.net.preferIPv4Stack=true") \
         .getOrCreate()
     
     # Suppress Kafka threading warnings (KAFKA-1894)
     spark.sparkContext.setLogLevel("ERROR")
     print("=== Spark Streaming Pipeline Started ===")
-    print("Subscribing to Kafka topics: ocpp.messages, ocpp.messages_test")
+    print("Subscribing to Kafka topics: ocpp.messages")
 
     # Register UDFs
     get_transaction_id_udf = udf(get_transaction_id, StringType())
@@ -206,16 +222,19 @@ def run_pipeline():
     kafka_df = spark.readStream \
         .format("kafka") \
         .option("kafka.bootstrap.servers", KAFKA_BROKER) \
-        .option("subscribe", "ocpp.messages,ocpp.messages_test") \
+        .option("subscribe", "ocpp.messages") \
         .option("startingOffsets", "earliest") \
         .option("failOnDataLoss", "false") \
         .load()
 
     # Parse JSON and extract fields
+    # Message format in value: {"chargerId": "...", "uniqueId": "...", "message": "[2, ...]"}
+    # Key is the uniqueId
     parsed_df = kafka_df.select(
         col("topic"),
+        col("key").cast("string").alias("uniqueId"),
         from_json(col("value").cast("string"), message_schema).alias("data")
-    ).select("topic", "data.*")
+    ).select("topic", "uniqueId", "data.*")
 
     messages_df = parsed_df \
         .withColumn("action", parse_action_udf(col("message"))) \
@@ -250,7 +269,7 @@ def run_pipeline():
     active_messages = messages_df.filter(col("isStop") == False)
     completed_messages = messages_df.filter(col("isStop") == True)
 
-    # BRANCH 1: Normalized messages -> ocpp.active.raw or ocpp.active.raw_test
+    # BRANCH 1: Normalized messages -> ocpp.active.raw or ocpp.active.raw
     def write_normalized(batch_df: DataFrame, batch_id: int) -> None:
         from confluent_kafka import Producer
         count = batch_df.count()
@@ -271,9 +290,9 @@ def run_pipeline():
         producer.flush()
         print(f"[write_normalized] Batch {batch_id}: Wrote {count} messages to ocpp.active.raw")
 
-    q1 = active_messages.writeStream.foreachBatch(write_normalized).outputMode("append").option("checkpointLocation", "./spark-checkpoints/active_raw").start()
+    q1 = active_messages.writeStream.foreachBatch(write_normalized).outputMode("append").option("checkpointLocation", f"{CHECKPOINT_DIR}/active_raw").start()
 
-    # BRANCH 2: Session state -> ocpp.active or ocpp.active_test
+    # BRANCH 2: Session state -> ocpp.active or ocpp.active
     def write_state(batch_df: DataFrame, batch_id: int) -> None:
         from confluent_kafka import Producer
         from datetime import datetime
@@ -301,7 +320,7 @@ def run_pipeline():
         producer.flush()
         print(f"[write_state] Batch {batch_id}: Wrote {count} state updates to ocpp.active")
 
-    q2 = active_messages.writeStream.foreachBatch(write_state).outputMode("append").option("checkpointLocation", "./spark-checkpoints/active").start()
+    q2 = active_messages.writeStream.foreachBatch(write_state).outputMode("append").option("checkpointLocation", f"{CHECKPOINT_DIR}/active").start()
 
     # BRANCH 3: Completed sessions -> PostgreSQL ocpp.history or ocpp.history_test
     messages_with_watermark = messages_df.withWatermark("eventTime", "1 hour")
@@ -323,7 +342,8 @@ def run_pipeline():
         .withColumn("duration", (unix_timestamp(col("endTime")) - unix_timestamp(col("startTime"))).cast("int")) \
         .withColumn("totalEnergyConsumed", when((col("powerCount") > 0) & (col("duration").isNotNull()), spark_round(col("powerSum") / col("powerCount") * (col("duration") / 3600), 3)).otherwise(lit(None))) \
         .withColumn("avgPower", when(col("powerCount") > 0, col("powerSum") / col("powerCount")).otherwise(lit(None))) \
-        .select(col("sessionId"), col("stationId"), col("transactionId"), lit("completed").alias("status"), col("startTime"), col("endTime"), col("duration"), col("terminationReason"), col("totalEnergyConsumed"), col("maxPower"), col("idTag"), col("connectorId"), col("meterStart"), col("meterStop"), col("socStart"), col("socEnd"), col("voltageAvg"), col("eventCount"))
+        .withColumn("lastSeen", col("endTime")) \
+        .select(col("sessionId"), col("stationId"), col("transactionId"), lit("completed").alias("status"), col("startTime"), col("endTime"), col("duration"), col("lastSeen"), col("terminationReason"), col("totalEnergyConsumed"), col("avgPower"), col("maxPower"), col("idTag"), col("connectorId"), col("meterStart"), col("meterStop"), col("socStart"), col("socEnd"), col("voltageAvg"), col("eventCount"))
 
     def write_pg(batch_df: DataFrame, batch_id: int) -> None:
         count = batch_df.count()
@@ -337,7 +357,7 @@ def run_pipeline():
             else:
                 raise
 
-    q3 = result_df.writeStream.foreachBatch(write_pg).outputMode("update").option("checkpointLocation", "./spark-checkpoints/history").start()
+    q3 = result_df.writeStream.foreachBatch(write_pg).outputMode("update").option("checkpointLocation", f"{CHECKPOINT_DIR}/history").start()
 
     # BRANCH 4: Tombstones
     def send_tombstones(batch_df: DataFrame, batch_id: int) -> None:
@@ -352,7 +372,7 @@ def run_pipeline():
         producer.flush()
         print(f"[send_tombstones] Batch {batch_id}: Sent tombstones for {count} sessions")
 
-    q4 = completed_messages.writeStream.foreachBatch(send_tombstones).outputMode("append").option("checkpointLocation", "./spark-checkpoints/tombstones").start()
+    q4 = completed_messages.writeStream.foreachBatch(send_tombstones).outputMode("append").option("checkpointLocation", f"{CHECKPOINT_DIR}/tombstones").start()
 
     q1.awaitTermination()
     q2.awaitTermination()

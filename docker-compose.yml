@@ -1,7 +1,15 @@
 version: '3.8'
 
+# Unified Docker Compose configuration with profiles
+# Usage:
+#   Production: docker compose --profile production up -d
+#   Test:       docker compose --profile test up -d
+
 services:
-  # PostgreSQL + TimescaleDB
+  # =============================================================================
+  # Production Services (profile: production)
+  # =============================================================================
+
   postgres:
     image: timescale/timescaledb:latest-pg14
     container_name: ev_coorp_postgres
@@ -18,8 +26,10 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - production-network
+    profiles: ["production"]
 
-  # Zookeeper (required for Kafka)
   zookeeper:
     image: confluentinc/cp-zookeeper:7.4.0
     hostname: zookeeper
@@ -29,8 +39,10 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - production-network
+    profiles: ["production"]
 
-  # Kafka
   kafka:
     image: confluentinc/cp-kafka:7.4.0
     hostname: kafka
@@ -39,23 +51,26 @@ services:
       - zookeeper
     ports:
       - "9092:9092"
-      - "29092:29092"  # Add this port mapping
+      - "29092:29092"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_INTERNAL://0.0.0.0:29092  # Add this
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT_INTERNAL:PLAINTEXT,PLAINTEXT_DOCKER:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT_INTERNAL://0.0.0.0:9092,PLAINTEXT_DOCKER://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT_INTERNAL://localhost:9092,PLAINTEXT_DOCKER://kafka:29092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    networks:
+      - production-network
+    profiles: ["production"]
 
-  # Schema Registry
   schema-registry:
     image: confluentinc/cp-schema-registry:7.4.0
     hostname: schema-registry
-    container_name: schema-registry
+    container_name: schema_registry
     depends_on:
       - kafka
     ports:
@@ -64,8 +79,10 @@ services:
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:29092
       SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
-  
-  # Grafana
+    networks:
+      - production-network
+    profiles: ["production"]
+
   grafana:
     image: grafana/grafana-oss:latest
     environment:
@@ -78,8 +95,11 @@ services:
       - "3000:3000"
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning  # Mount provisioning files
+      - ./grafana/provisioning:/etc/grafana/provisioning
     restart: unless-stopped
+    networks:
+      - production-network
+    profiles: ["production"]
 
   spark:
     image: spark:latest
@@ -92,7 +112,144 @@ services:
     depends_on:
       - kafka
       - postgres
+    networks:
+      - production-network
+    profiles: ["production"]
+
+  # =============================================================================
+  # Test Services (profile: test)
+  # =============================================================================
+
+  postgres-test:
+    image: timescale/timescaledb:latest-pg14
+    container_name: ev_coorp_postgres_test
+    environment:
+      POSTGRES_USER: ev_user
+      POSTGRES_PASSWORD: ev_password
+      POSTGRES_DB: ev_coorp_test
+    ports:
+      - "5433:5432"  # Different port to avoid conflict
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ev_user -d ev_coorp_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - test-network
+    profiles: ["test"]
+
+  zookeeper-test:
+    image: confluentinc/cp-zookeeper:7.4.0
+    hostname: zookeeper-test
+    container_name: zookeeper_test
+    ports:
+      - "2182:2181"  # Different port
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    healthcheck:
+      test: ["CMD-SHELL", "echo ruok | nc localhost 2181 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    networks:
+      - test-network
+    profiles: ["test"]
+
+  kafka-test:
+    image: confluentinc/cp-kafka:7.4.0
+    hostname: kafka-test
+    container_name: kafka_test
+    depends_on:
+      zookeeper-test:
+        condition: service_healthy
+    ports:
+      - "9093:9093"  # Different port for external listener
+      - "29093:29093"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper-test:2181
+      KAFKA_ZOOKEEPER_CONNECTION_TIMEOUT_MS: 30000
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT_INTERNAL:PLAINTEXT,PLAINTEXT_EXTERNAL:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT_INTERNAL://0.0.0.0:9092,PLAINTEXT_EXTERNAL://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT_INTERNAL://kafka-test:9092,PLAINTEXT_EXTERNAL://localhost:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    networks:
+      - test-network
+    profiles: ["test"]
+
+  schema-registry-test:
+    image: confluentinc/cp-schema-registry:7.4.0
+    hostname: schema-registry-test
+    container_name: schema_registry_test
+    depends_on:
+      - kafka-test
+    ports:
+      - "8082:8081"  # Different port
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry-test
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka-test:29092
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    networks:
+      - test-network
+    profiles: ["test"]
+
+  spark-test:
+    image: spark:latest
+    container_name: spark_test
+    volumes:
+      - ./spark/scripts:/app
+    environment:
+      - SPARK_MODE=standalone
+    ports:
+      - "4041:4040"
+    depends_on:
+      - kafka-test
+      - postgres-test
+    networks:
+      - test-network
+    profiles: ["test"]
+
+  grafana-test:
+    image: grafana/grafana-oss:latest
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_PLUGINS_PREINSTALL=hamedkarbasi93-kafka-datasource
+    container_name: grafana_test
+    ports:
+      - "3001:3000"  # Different port
+    volumes:
+      - grafana_test_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    restart: unless-stopped
+    networks:
+      - test-network
+    profiles: ["test"]
+
+# =============================================================================
+# Networks
+# =============================================================================
+
+networks:
+  production-network:
+    driver: bridge
+  test-network:
+    driver: bridge
+
+# =============================================================================
+# Volumes
+# =============================================================================
 
 volumes:
   postgres_data:
   grafana_data:
+  postgres_test_data:
+  grafana_test_data:
