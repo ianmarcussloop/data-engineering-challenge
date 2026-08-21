@@ -1,0 +1,26 @@
+- Write tests for the sql model
+- Enforce Kafka topics with Avro or Protobuf (?) - Done (overwritten, json simpler, avro overkill)
+- Does Spark have a sensible place somewhere in this architecture?
+	- yes, can replace the ocpp_producer.py at scale for larger .txt file inputs
+- Creating stream/table for ocpp.messages automatically via docker is proving difficult, does it maybe make more sense to reconsider the architecture, replace the python scripts with spark jobs?
+- write tests for everything (TDD principle)
+- get the logic working right
+- Verify everything Mistral Vibe AI has told you about the OCPP Protocol is true
+
+- Write a history, realtime table? realtime covers all ongoing charging sessions that don't have a stop transaction, and history table has all completed or failed or other state charging sessions that are in one way or another marked as complete.
+
+- what are other kinds of stop signals besides `StopTransaction`and `RemoteStopTransaction`?
+- Move all tests under for example kafka/test, spark/test(s) to the root level test/ folder
+- Use more environment variables for DB_URL to improve security in production 
+- what does it mean to run with test coverage? See main README.md line 209
+- what does zookeeper do?
+- manually check all AI generated tests to see if they are sensible (actually test what they claim to) and to see if they can be simplified (some are very verbose and can be made smaller for readability, others are duplicates or don't test anything meaningful and can be deleted)
+- add a log to `uv run python spark/scripts/spark_kafka_to_postgres.py` to notify the user when the setup is done and when spark is now running and listening for messages to kafka
+- clear spark checkpoints between spark runs if the schemas has changed? is that the reason? or if the spark job fails halfway through? `rm -rf spark-checkpoints/`
+- deal with (for `uv run python kafka/scripts/ocpp_producer.py`) ⚠️ Skipping malformed line: charger1 : [3,"20250827 103724675134Z",{"configurationKey":[{"key":"HeartbeatInterval","readonly":false,"value":"15"}]}] (Error: malformed node or string on line 1: <ast.Name object at 0x10280b890>)
+- why does this happen? (for `uv run python kafka/scripts/ocpp_producer.py`) ❌ Failed to publish {'chargerId': 'charger8', 'uniqueId': '20250827 235958740041Z', 'message': "[3, '20250827 235958740041Z', {'status': 'Accepted'}]"}: Local: Queue full
+- to have a sessionId with charger1_startTimestamp vs for example charger1_1 (transactionId) we need a window function which adds a lot of complexity, is there any advantage to having the start time in the sessionId? we can still filter based off the chargerId column and the startTime column separately, they don't both need to be here in this field do they?
+- should `uv run python spark/scripts/spark_kafka_to_postgres.py` run on something like a kubernetes cluster or something so that it can survive restarts?
+- write some sql views that organise across time and chargers (and various sites in the future?)
+- do a manual math check of the totalEnergyConsumed, maxPower, avgPower, etc.
+- we could add a voltage min/max?

@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"name": "data-engineering-challenge",
+			"path": "../.."
+		},
+		{
+			"name": "OCPP-2.1_part3_JSON_schemas",
+			"path": "../../../Downloads/OCPP-2.1_part3_JSON_schemas"
+		},
+		{
+			"name": "OCPP-2.1_all_files",
+			"path": "../../../Downloads/OCPP-2.1_all_files"
+		}
+	],
+	"settings": {}
+}

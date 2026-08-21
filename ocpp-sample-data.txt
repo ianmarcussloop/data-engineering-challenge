@@ -1,0 +1,76 @@
+# =============================================================================
+# OCPP Sample Data for Testing
+# =============================================================================
+# This file contains representative OCPP message data for testing purposes.
+# It includes both normal behavior cases and corner cases.
+#
+# Normal Cases:
+# - Complete request/response pairs for various message types
+# - Different chargers
+# - Different message types (Heartbeat, MeterValues, StatusNotification, etc.)
+#
+# Corner Cases:
+# - Unpaired request (no matching response)
+# - Unpaired response (no matching request)
+# - Malformed lines (invalid format, can't be parsed)
+# - Messages with error codes
+# - Messages with different timestamp formats
+# =============================================================================
+
+# Normal Case 1: Heartbeat request+response pair from charger1
+charger1 : [2,"heartbeat-001","Heartbeat",{ }]
+charger1 : [3,"heartbeat-001",{"currentTime":"2025-08-23T00:00:03.207779Z"}]
+
+# Normal Case 2: MeterValues request+response pair from charger2
+charger2 : [2,"meter-001","MeterValues",{"connectorId":1,"transactionId":1,"meterValue":[{"timestamp":"2025-08-23T10:00:00Z","sampledValue":[{"value":"22.5","context":"Sample.Periodic","format":"Raw","measurand":"Power.Active.Import","location":"Outlet","unit":"kW"}]}]}]
+charger2 : [3,"meter-001",{}]
+
+# Normal Case 3: StatusNotification with normal status
+charger3 : [2,"status-001","StatusNotification",{"connectorId":1,"errorCode":"NoError","info":"","status":"Available","timestamp":"2025-08-23T00:58:02.082Z","vendorId":"charger brand Technology","vendorErrorCode":""}]
+charger3 : [3,"status-001",{}]
+
+# Normal Case 4: StartTransaction request+response
+charger1 : [2,"txn-001","StartTransaction",{"connectorId":1,"idTag":"0016810907d2","meterStart":19334102,"timestamp":"2025-08-23T00:57:11.302Z"}]
+charger1 : [3,"txn-001",{}]
+
+# Normal Case 5: StopTransaction request+response
+charger1 : [2,"txn-002","StopTransaction",{"idTag":"0016810907d2","meterStop":19334102,"transactionId":1,"timestamp":"2025-08-23T00:57:47.265Z","reason":"EVDisconnected"}]
+charger1 : [3,"txn-002",{}]
+
+# Normal Case 6: SetChargingProfile with timestamp without T separator (space instead)
+charger4 : [2,"20250823 005714984478Z","SetChargingProfile",{"connectorId":1,"csChargingProfiles":{"chargingProfileId":3,"chargingProfileKind":"Relative","chargingProfilePurpose":"TxProfile","chargingSchedule":{"chargingRateUnit":"W","chargingSchedulePeriod":[{"limit":27999.0,"numberPhases":3,"startPeriod":0}],"duration":86400,"minChargingRate":0.0},"recurrencyKind":"Daily","stackLevel":3,"transactionId":1}}]
+charger4 : [3,"20250823 005714984478Z",{}]
+
+# Corner Case 1: Unpaired request (no response)
+charger5 : [2,"unpaired-req-001","MeterValues",{"connectorId":1,"transactionId":999,"meterValue":[{"timestamp":"2025-08-23T12:00:00Z","sampledValue":[{"value":"10.0","context":"Sample.Periodic","format":"Raw","measurand":"Power.Active.Import","location":"Outlet","unit":"kW"}]}]}]
+
+# Corner Case 2: Unpaired response (no request)
+charger6 : [3,"unpaired-resp-001",{"currentTime":"2025-08-23T13:00:00Z"}]
+
+# Corner Case 3: StatusNotification with error (Faulted status)
+charger7 : [2,"error-001","StatusNotification",{"connectorId":1,"errorCode":"InternalError","info":"","status":"Faulted","timestamp":"2025-08-23T01:08:32.965Z","vendorId":"charger brand Technology","vendorErrorCode":"012230"}]
+charger7 : [3,"error-001",{}]
+
+# Corner Case 4: Malformed line - missing colon separator
+charger8 [2,"malformed-001","Heartbeat",{ }]
+
+# Corner Case 5: Malformed line - empty message
+charger9 : 
+
+# Corner Case 6: Malformed line - invalid JSON
+charger10 : [2,"malformed-002","Heartbeat"{ }]
+
+# Corner Case 7: Message too short (only message type)
+charger11 : [2]
+
+# Corner Case 8: StatusNotification with OtherError
+charger12 : [2,"error-002","StatusNotification",{"connectorId":2,"errorCode":"OtherError","info":"","status":"Faulted","timestamp":"2025-08-24T16:53:53.690Z","vendorId":"charger brand Technology","vendorErrorCode":"023844"}]
+charger12 : [3,"error-002",{}]
+
+# Normal Case 7: Multiple sequential Heartbeats from same charger
+charger1 : [2,"heartbeat-002","Heartbeat",{ }]
+charger1 : [3,"heartbeat-002",{"currentTime":"2025-08-23T00:01:04.430415Z"}]
+
+# Normal Case 8: Heartbeat with spaces in JSON
+charger2 : [2,"heartbeat-003","Heartbeat",{ }]
+charger2 : [3,"heartbeat-003",{"currentTime":"2025-08-23T00:01:19.730812Z"}]

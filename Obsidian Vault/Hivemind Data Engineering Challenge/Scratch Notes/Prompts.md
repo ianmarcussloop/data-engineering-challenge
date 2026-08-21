@@ -1,0 +1,7 @@
+- How to enter the docker container, stay in it, and from there run diagnostic commands that check each step of the data pipeline, from data ingestion into the kafka topic, to data transfer from the kafka topic to the sql table, as well as health diagnostics after the topic and table have been created, to show they were created successfully, have the correct schema
+- 
+- Grafana tells me for my Postgres table view: You do not currently have a default database configured for this datasource. Postgres requires a default database with which to connect. please configure one through the Data Sources Configuration page, or if you are using a provisioning file, update that configuration file with a default database. I would like to solve this with the provisioning file. If the table I want to view is ocpp.charger_session, is the database ocpp? what needs to be added where for this?
+
+- look at data1 and data2 for context, as this is the beginning of the data stream and informs all downstream transformations
+- are there any other ways a session could end aside from a StopTransaction or RemoteStopTransaction?
+- lets have the cleanup.policy on the ocpp.active.raw be compact, so that finished sessions are removed for ease of readability on the remaining active sessions
