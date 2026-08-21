@@ -163,35 +163,41 @@ class TestOCPPMessageConsumption:
         producer.produce("ocpp.active", key=session_id, value=json.dumps(msg))
         producer.flush(timeout=5)
         
-        # Give the message time to be written
-        time.sleep(2)
+        # Give the message time to be written and replicated
+        time.sleep(3)
         
-        # Consume with key and unique group
+        # Consume with key and unique group - use earliest to find our message
+        # Since we use a unique session_id, and the consumer group is new,
+        # it will read from the earliest uncommitted offset
         consumer = Consumer({
             "bootstrap.servers": TEST_KAFKA_BROKER,
             "group.id": f"test_consume_active_key_{unique_id}",
-            "auto.offset.reset": "latest",
+            "auto.offset.reset": "earliest",
             "enable.auto.commit": False
         })
         consumer.subscribe(["ocpp.active"])
         
-        # Poll multiple times to find our specific message
+        # Poll to find our specific message
         found_our_message = False
-        for _ in range(20):
+        poll_count = 0
+        while poll_count < 50:  # Increased limit for compacted topic
             consumed_msg = consumer.poll(timeout=1)
             if consumed_msg is None:
-                break
+                poll_count += 1
+                continue
+            
             if consumed_msg.key() == session_id.encode('utf-8'):
                 # Check the value contains our session_id
                 value = json.loads(consumed_msg.value().decode('utf-8'))
                 if value.get("sessionId") == session_id:
                     found_our_message = True
                     break
+            poll_count += 1
         
         consumer.close()
         
         # We should have found our message
-        assert found_our_message, f"Did not find message with key {session_id} in ocpp.active"
+        assert found_our_message, f"Did not find message with key {session_id} in ocpp.active after {poll_count} polls"
 
 
 class TestOCPPMessageFormat:
