@@ -61,7 +61,9 @@ The structure above is just one example - you're free to use any output format t
 - Consider how to determine operational status in incomplete or inconsistent scenarios
 - To calculate the energy consumption you would have to calculate the integral of the power curve over time, but for simplicity you can safely approximate this by the average of the power curve and multiply it by the duration of the session to create a simple estimate. e.g. 5kW * 1h = 5kWh. Look for `Power.Active.Import`.
 
-# Run
+## Documentation
+
+Look under the "Obsidian Vault" folder for all documentation
 
 ## Quick Start
 
@@ -74,11 +76,18 @@ uv sync
 # 2. Start infrastructure and initialize everything
 make init
 
-# 3. Run all tests
+# 3. Wait for the Spark pipeline to run from `make init`
+
+# 4. Visit Grafana and manually create dashboards for kafka topics and postgres tables
+- **URL**: `http://localhost:3000`
+- **Username**: `admin`
+- **Password**: `admin`
+
+
+# 3. (Optional) Run all tests
 make test
 
-# 4. Clean up when done
-make cleanup-all  # Cleans data but keeps containers running
+# 4. (Optional) Clean up when done (is done on every new start anyway)
 make clean        # Stops and removes containers
 ```
 
@@ -118,15 +127,6 @@ make ps
 # View logs
 make logs
 ```
-
-### Grafana
-
-Grafana is created as part of `docker compose up -d`
-- **URL**: `http://localhost:3000`
-- **Username**: `admin`
-- **Password**: `admin`
-
-Grafana is pre-configured with PostgreSQL and Kafka data sources.
 
 ### Initialize Infrastructure
 

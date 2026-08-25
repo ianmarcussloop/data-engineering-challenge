@@ -24,7 +24,7 @@
 #   make clean-test        # Clean up isolated test Docker environment
 # =============================================================================
 
-.PHONY: help init init-light start stop start-test stop-test db-init kafka-init test test-unit test-spark test-kafka test-postgres test-e2e test-db-init test-kafka-init produce-data-test consume-data-test clean cleanup cleanup-main cleanup-all
+.PHONY: help init init-light start stop start-test stop-test db-init kafka-init test test-unit test-spark test-kafka test-postgres test-e2e test-db-init test-kafka-init produce-data-test consume-data-test consume-active clean cleanup cleanup-main cleanup-all
 
 # Project directory
 PROJECT_DIR := $(shell pwd)
@@ -67,6 +67,7 @@ help:
 	@echo "Data:"
 	@echo "  produce-data      Produce sample data to Kafka"
 	@echo "  consume-data      Consume messages from Kafka to PostgreSQL"
+	@echo "  consume-active    Consume ocpp.active messages to PostgreSQL"
 	@echo ""
 	@echo "Cleanup:"
 	@echo "  cleanup           Clean up main project environment (truncate DB + empty Kafka)"
@@ -79,6 +80,8 @@ help:
 # =============================================================================
 
 init:
+	@echo "=== Clean up environment before start ==="
+	$(MAKE) clean
 	@echo "=== Running full initialization ==="
 	$(MAKE) start
 	@sleep 5
@@ -86,12 +89,14 @@ init:
 	$(MAKE) kafka-init
 	$(MAKE) produce-data
 	$(MAKE) consume-data
+	$(MAKE) consume-active
 	@echo "Waiting for data to be processed..."
 	@sleep 10
 	@echo "=== Initialization complete ==="
 
 init-light:
 	@echo "=== Running light initialization (no sample data) ==="
+	$(MAKE) clean
 	$(MAKE) start
 	@sleep 5
 	$(MAKE) db-init
@@ -195,6 +200,11 @@ consume-data:
 	@echo "Press Ctrl+C to stop"
 	cd $(PROJECT_DIR) && SPARK_LOCAL_IP=127.0.0.1 CHECKPOINT_DIR=./spark-checkpoints uv run python spark/scripts/spark_kafka_to_postgres.py
 
+consume-active:
+	@echo "=== Consuming ocpp.active data to PostgreSQL ==="
+	@echo "Press Ctrl+C to stop"
+	cd $(PROJECT_DIR) && uv run python postgres/scripts/kafka_active_to_postgres.py
+
 # =============================================================================
 # Tests
 # =============================================================================
@@ -251,6 +261,11 @@ consume-data-test:
 	@echo "=== Consuming test data to PostgreSQL ==="
 	@echo "Press Ctrl+C to stop"
 	cd $(PROJECT_DIR) && SPARK_LOCAL_IP=127.0.0.1 CHECKPOINT_DIR=./spark-checkpoints-test KAFKA_BROKER=localhost:9093 POSTGRES_URL=jdbc:postgresql://localhost:5433/ev_coorp_test POSTGRES_USER=ev_user POSTGRES_PASSWORD=ev_password uv run python spark/scripts/spark_kafka_to_postgres.py
+
+consume-active-test:
+	@echo "=== Consuming test ocpp.active data to PostgreSQL ==="
+	@echo "Press Ctrl+C to stop"
+	cd $(PROJECT_DIR) && KAFKA_BROKER=localhost:9093 KAFKA_TOPIC_ACTIVE=ocpp.active_test DATABASE_URL=postgresql://ev_user:ev_password@localhost:5433/ev_coorp_test uv run python postgres/scripts/kafka_active_to_postgres.py
 
 # =============================================================================
 # Isolated Test Environment

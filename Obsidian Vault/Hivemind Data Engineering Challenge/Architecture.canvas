@@ -1,17 +1,22 @@
 {
 	"nodes":[
-		{"id":"c3d9d9a0585281f3","type":"group","x":60,"y":360,"width":360,"height":180,"label":"Grafana"},
-		{"id":"736d0e5dacd3d934","type":"text","text":"blablub","x":-125,"y":-30,"width":250,"height":60},
-		{"id":"49b4af2952fb2747","type":"text","text":"Short Term Storage\n- Kafka Topics \n\t- `ocpp.messages`\n\t- `ocpp.active`\n\t- `ocpp.active.raw`\n\t- `ocpp.malformed`","x":-140,"y":120,"width":285,"height":200},
-		{"id":"ab5293ed33139c63","type":"text","text":"Real-time / Stateful Dashboard (Kafka)","x":80,"y":380,"width":320,"height":54},
-		{"id":"03711d827c6682f7","type":"text","text":"Historical Dashboard (PostgreSQL)","x":80,"y":458,"width":320,"height":60},
+		{"id":"c3d9d9a0585281f3","type":"group","x":100,"y":420,"width":380,"height":180,"label":"Grafana"},
 		{"id":"72c21f9856a59a49","type":"text","text":"Long Term Storage\n- `ocpp.history` table","x":-295,"y":407,"width":240,"height":114},
-		{"id":"d1da879b55f11e47","type":"text","text":"OCPP Kafka Producer\n\n- `ocpp-data-many-chargers.txt`\n- `ocpp-data-many-days.txt`","x":-175,"y":-75,"width":355,"height":150}
+		{"id":"49b4af2952fb2747","type":"text","text":"Kafka \n- `ocpp.messages`","x":-140,"y":60,"width":285,"height":110},
+		{"id":"ab5293ed33139c63","type":"text","text":"Real-time / Stateful Dashboard (ksqlDB not yet implemented)","x":128,"y":443,"width":340,"height":54},
+		{"id":"03711d827c6682f7","type":"text","text":"Historical Dashboard (PostgreSQL)","x":128,"y":521,"width":340,"height":60},
+		{"id":"b8c95aaf89b6c8c7","x":173,"y":170,"width":250,"height":160,"type":"text","text":"Kafka\n- `ocpp.active`\n- `ocpp.active.raw`\n- `ocpp.malformed`"},
+		{"id":"ebf748cd317da062","x":-247,"y":250,"width":250,"height":60,"type":"text","text":"Spark"},
+		{"id":"d1da879b55f11e47","type":"text","text":"OCPP Kafka Producer\n\n- `ocpp-data-many-chargers.txt`\n- `ocpp-data-many-days.txt`","x":-174,"y":-180,"width":355,"height":111},
+		{"id":"736d0e5dacd3d934","type":"text","text":"Python Script (could be spark)","x":-122,"y":-40,"width":250,"height":60}
 	],
 	"edges":[
-		{"id":"0d47c59dc0abfce7","fromNode":"49b4af2952fb2747","fromSide":"bottom","toNode":"72c21f9856a59a49","toSide":"top"},
-		{"id":"d8b6d9e78e51c48f","fromNode":"49b4af2952fb2747","fromSide":"bottom","toNode":"ab5293ed33139c63","toSide":"left"},
-		{"id":"52f80a4e7bf6731c","fromNode":"d1da879b55f11e47","fromSide":"bottom","toNode":"49b4af2952fb2747","toSide":"top"},
-		{"id":"dd6ffbf90fdc64a5","fromNode":"72c21f9856a59a49","fromSide":"right","toNode":"03711d827c6682f7","toSide":"left"}
+		{"id":"dd6ffbf90fdc64a5","fromNode":"72c21f9856a59a49","fromSide":"right","toNode":"03711d827c6682f7","toSide":"left"},
+		{"id":"b45dff903c529b78","fromNode":"49b4af2952fb2747","fromSide":"bottom","toNode":"ebf748cd317da062","toSide":"top"},
+		{"id":"df6d6282825ba434","fromNode":"ebf748cd317da062","fromSide":"right","toNode":"b8c95aaf89b6c8c7","toSide":"left"},
+		{"id":"064e5c8a3e8d93bc","fromNode":"b8c95aaf89b6c8c7","fromSide":"bottom","toNode":"c3d9d9a0585281f3","toSide":"top"},
+		{"id":"9d7f9bcfcc1ef718","fromNode":"ebf748cd317da062","fromSide":"bottom","toNode":"72c21f9856a59a49","toSide":"top"},
+		{"id":"2e60de2ebd8a9cee","fromNode":"d1da879b55f11e47","fromSide":"bottom","toNode":"736d0e5dacd3d934","toSide":"top"},
+		{"id":"0088f96152454396","fromNode":"736d0e5dacd3d934","fromSide":"bottom","toNode":"49b4af2952fb2747","toSide":"top"}
 	]
 }

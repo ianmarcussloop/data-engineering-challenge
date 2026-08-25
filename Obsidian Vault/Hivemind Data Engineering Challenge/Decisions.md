@@ -1,6 +1,6 @@
-- Schema Registry included because it validates every message based on the schema
+- Schema Registry included because it validates every message based on the schema (Currently in JSON format for ease of MVP creation, had bugs)
 	- Allows easier schema changes post-deployment
-- Add Kafka plugin to Grafana instead of having ksql?
+- Add Kafka plugin to Grafana instead of having ksql? (plugin doesn't exist, AI hallucination)
 - We have `uv run python postgres/scripts/kafka_to_postgres.py` for small datasets and `uv run python spark/scripts/spark_kafka_to_postgres.py` for larger ones
 - abandon avro schema for now to get spark working, implement later if enough time
 - can we rely on schema-less json because our data is following ocpp and we can more reasonably expect it to adhere to its predefined schema?
